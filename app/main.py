@@ -4,6 +4,8 @@ from fastapi.security import HTTPBearer
 from app.database import Base, engine
 from app.routers.users import router as user_router
 from app.routers.auth import router as auth_router
+from app.routers.assistants import router as assistants_router
+
 
 # Initialize HTTP Bearer scheme
 security_scheme = HTTPBearer()
@@ -29,3 +31,4 @@ Base.metadata.create_all(bind=engine)
 # Include routers
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(user_router, prefix="/users", tags=["Users"])
+app.include_router(assistants_router, prefix="/assistants", tags=["Assistants"])
