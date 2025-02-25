@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Security
 from sqlalchemy.orm import Session
+from app.database import SessionLocal
 from app.models.user import User
 from app.models.token import BlacklistedToken
 from app.schemas.user import UserLogin, UserCreate, UserResponse
