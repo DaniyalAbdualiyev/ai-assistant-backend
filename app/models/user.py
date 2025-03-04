@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
 
@@ -10,3 +11,5 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    assistants = relationship("AIAssistant", back_populates="owner", cascade="all, delete-orphan")
