@@ -13,3 +13,4 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     assistants = relationship("AIAssistant", back_populates="owner", cascade="all, delete-orphan")
+    messages = relationship("Message", back_populates="user", cascade="all, delete-orphan")
