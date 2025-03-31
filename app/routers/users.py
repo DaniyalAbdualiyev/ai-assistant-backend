@@ -9,13 +9,7 @@ from app.dependencies import get_current_user, get_db
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Dependency to get database session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Remove the get_db() function
 
 
     

@@ -7,15 +7,9 @@ from app.schemas.user import UserLogin, UserCreate, UserResponse
 from app.auth.jwt import verify_password, create_access_token, hash_password
 from app.dependencies import get_db, get_current_user
 from fastapi.security import HTTPBearer
+
 router = APIRouter()
 security = HTTPBearer()
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @router.post("/register", response_model=UserResponse)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
