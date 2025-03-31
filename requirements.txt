@@ -7,3 +7,5 @@ passlib[bcrypt]
 python-dotenv
 python-jose[cryptography]
 openai
+stripe
+requests

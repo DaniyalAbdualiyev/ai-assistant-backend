@@ -2,11 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from app.database import Base, engine
-from app.routers.users import router as user_router
-from app.routers.auth import router as auth_router
-from app.routers.assistants import router as assistants_router
-from app.routers.messages import router as messages_router
-
+from app.routers import users, auth, assistants, messages, payments
 
 # Initialize HTTP Bearer scheme
 security_scheme = HTTPBearer()
@@ -30,7 +26,8 @@ Base.metadata.create_all(bind=engine)
 
 
 # Include routers
-app.include_router(auth_router, prefix="/auth", tags=["Auth"])
-app.include_router(user_router, prefix="/users", tags=["Users"])
-app.include_router(assistants_router, prefix="/assistants", tags=["Assistants"])
-app.include_router(messages_router, prefix="/messages", tags=["Messages"]) 
+app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+app.include_router(users.router, prefix="/users", tags=["Users"])
+app.include_router(assistants.router, prefix="/assistants", tags=["Assistants"])
+app.include_router(messages.router, prefix="/messages", tags=["Messages"])
+app.include_router(payments.router, prefix="/payments")  # The tags are already defined in the router

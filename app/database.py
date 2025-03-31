@@ -6,13 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load envronment variables from .env file
 
-# Determine if running locally or in Render
-ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
-DATABASE_URL = (
-    os.getenv("DATABASE_URL_LOCAL") if ENVIRONMENT == "local" else os.getenv("DATABASE_URL_RENDER")
-)
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
-
-engine = create_engine(DATABASE_URL)
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
