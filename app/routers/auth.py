@@ -7,6 +7,11 @@ from app.schemas.user import UserLogin, UserCreate, UserResponse
 from app.auth.jwt import verify_password, create_access_token, hash_password
 from app.dependencies import get_db, get_current_user
 from fastapi.security import HTTPBearer
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 security = HTTPBearer()
@@ -14,8 +19,12 @@ security = HTTPBearer()
 @router.post("/register", response_model=UserResponse)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
     try:
+        # Log registration attempt
+        logger.info(f"Registration attempt for email: {user.email}")
+        
         existing_user = db.query(User).filter(User.email == user.email).first()
         if existing_user:
+            logger.warning(f"Email already registered: {user.email}")
             raise HTTPException(status_code=400, detail="Email already registered")
         
         hashed_password = hash_password(user.password)
@@ -23,10 +32,13 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
+        logger.info(f"User registered successfully: {user.email}")
         return db_user
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log the specific error
+        logger.error(f"Registration error for {user.email}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Registration error: {str(e)}")
 
 @router.post("/login")
 def login_user(user: UserLogin,db: Session = Depends(get_db)):
