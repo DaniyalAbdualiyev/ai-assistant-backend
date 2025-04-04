@@ -3,6 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from app.database import Base, engine
 from app.routers import users, auth, assistants, messages, payments
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Initialize HTTP Bearer scheme
 security_scheme = HTTPBearer()
@@ -13,9 +17,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Get allowed origins from environment variable or use default
+origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Allow only localhost:3000
+    allow_origins=origins,  # Use the origins from environment variable
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
