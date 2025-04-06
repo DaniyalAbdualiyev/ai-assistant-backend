@@ -10,3 +10,5 @@ openai
 stripe
 requests
 email-validator
+PyPDF2
+python-docx
