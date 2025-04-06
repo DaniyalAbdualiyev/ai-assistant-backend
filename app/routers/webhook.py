@@ -16,17 +16,19 @@ VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN", "21010767")
 
 # WhatsApp webhook verification endpoint
 @router.get("/whatsapp-webhook")
-async def verify_whatsapp_webhook(
-    hub_mode: str = None, 
-    hub_verify_token: str = None, 
-    hub_challenge: str = None
-):
-    logger.info(f"Webhook verification attempt - mode: {hub_mode}, token: {hub_verify_token}, challenge: {hub_challenge}")
+async def verify_whatsapp_webhook(request: Request):
+    # Get the query parameters - Meta uses hub.mode, hub.challenge, hub.verify_token
+    params = dict(request.query_params)
+    mode = params.get("hub.mode")
+    token = params.get("hub.verify_token")
+    challenge = params.get("hub.challenge")
+    
+    logger.info(f"Webhook verification attempt - mode: {mode}, token: {token}, challenge: {challenge}")
     
     # This is the critical part - Meta sends these exact query parameters
-    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
+    if mode == "subscribe" and token == VERIFY_TOKEN:
         logger.info("Webhook verified successfully")
-        return PlainTextResponse(content=hub_challenge)
+        return PlainTextResponse(content=challenge)
     
     logger.error("Webhook verification failed")
     return JSONResponse(
