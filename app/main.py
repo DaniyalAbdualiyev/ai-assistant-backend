@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from app.database import Base, engine
-from app.routers import users, auth, assistants, messages, payments
+from app.routers import users, auth, assistants, messages, payments, business_profiles, integrations, webhook
 import os
 from dotenv import load_dotenv
 
@@ -38,3 +38,6 @@ app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(assistants.router, prefix="/assistants", tags=["Assistants"])
 app.include_router(messages.router, prefix="/messages", tags=["Messages"])
 app.include_router(payments.router, prefix="/payments")  # The tags are already defined in the router
+app.include_router(business_profiles.router, prefix="/business", tags=["Business Profiles"])
+app.include_router(integrations.router, prefix="/integrations", tags=["Integrations"])
+app.include_router(webhook.router, tags=["Webhooks"])
