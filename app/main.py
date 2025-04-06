@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from app.database import Base, engine
-from app.routers import users, auth, assistants, messages, payments, business_profiles, integrations, webhook
+from app.routers import users, auth, assistants, messages, payments,business_profiles,integrations,webhook
 import os
 from dotenv import load_dotenv
 
