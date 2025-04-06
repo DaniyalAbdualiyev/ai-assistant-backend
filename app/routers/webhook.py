@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Verify token (must match what you entered in Meta Developer Console)
-VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN", "21010767")
+VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN", "210107067")
 
 # WhatsApp webhook verification endpoint
 @router.get("/whatsapp-webhook")
@@ -30,7 +30,7 @@ async def verify_whatsapp_webhook(request: Request):
         logger.info("Webhook verified successfully")
         return PlainTextResponse(content=challenge)
     
-    logger.error("Webhook verification failed")
+    logger.error(f"Webhook verification failed - token mismatch. Expected '{VERIFY_TOKEN}', got '{token}'")
     return JSONResponse(
         content={"success": False, "message": "Verification failed"}, 
         status_code=403
