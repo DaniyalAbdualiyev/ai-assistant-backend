@@ -33,11 +33,11 @@ Base.metadata.create_all(bind=engine)
 
 
 # Include routers
-app.include_router(auth.router, prefix="/auth", tags=["Auth"])
-app.include_router(users.router, prefix="/users", tags=["Users"])
-app.include_router(assistants.router, prefix="/assistants", tags=["Assistants"])
-app.include_router(messages.router, prefix="/messages", tags=["Messages"])
-app.include_router(payments.router, prefix="/payments")  # The tags are already defined in the router
-app.include_router(business_profiles.router, prefix="/business", tags=["Business Profiles"])
-app.include_router(integrations.router, prefix="/integrations", tags=["Integrations"])
-app.include_router(webhook.router, tags=["Webhooks"])
+app.include_router(auth, prefix="/auth", tags=["Auth"])
+app.include_router(users, prefix="/users", tags=["Users"])
+app.include_router(assistants, prefix="/assistants", tags=["Assistants"])
+app.include_router(messages, prefix="/messages", tags=["Messages"])
+app.include_router(payments, prefix="/payments")  # The tags are already defined in the router
+app.include_router(business_profiles, prefix="/business", tags=["Business Profiles"])
+app.include_router(integrations, prefix="/integrations", tags=["Integrations"])
+app.include_router(webhook, tags=["Webhooks"])
