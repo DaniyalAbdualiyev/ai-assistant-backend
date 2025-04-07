@@ -10,6 +10,9 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import os
 from datetime import datetime
+from app.models.business_profile import BusinessProfile
+from app.services.vector_store import search_similar_texts
+import logging
 
 
 load_dotenv()
@@ -86,22 +89,53 @@ def save_initial_message(user_query: str, assistant_id: int, user_id: int, db: S
 
 def prepare_chat_context(assistant_id: int, current_message: str, db: Session) -> list:
     """Get chat history and format it for the AI model."""
-    # Get recent chat history
-    chat_history = db.query(Message).filter(
-        Message.assistant_id == assistant_id
-    ).order_by(Message.timestamp.desc()).limit(5).all()
-    
-    # Format messages for OpenAI
-    formatted_messages = []
-    for msg in reversed(chat_history):
-        formatted_messages.extend([
-            {"role": "user", "content": msg.user_query},
-            {"role": "assistant", "content": msg.ai_response}
-        ])
-    
-    # Add current message
-    formatted_messages.append({"role": "user", "content": current_message})
-    return formatted_messages
+    try:
+        # Get the business profile for this assistant
+        business_profile = db.query(BusinessProfile).filter(
+            BusinessProfile.assistant_id == assistant_id
+        ).first()
+        
+        # Initialize context with system message
+        formatted_messages = [{
+            "role": "system",
+            "content": "You are a helpful AI assistant for a business. Use the provided business knowledge to answer questions accurately."
+        }]
+        
+        # If we have a business profile with knowledge base, search for relevant information
+        if business_profile and business_profile.knowledge_base:
+            relevant_docs = search_similar_texts(current_message)
+            
+            if relevant_docs:
+                # Add relevant business knowledge to context
+                knowledge_context = "\n".join([
+                    f"Business Knowledge: {doc.metadata['text']}"
+                    for doc in relevant_docs
+                ])
+                formatted_messages.append({
+                    "role": "system",
+                    "content": knowledge_context
+                })
+        
+        # Get recent chat history
+        chat_history = db.query(Message).filter(
+            Message.assistant_id == assistant_id
+        ).order_by(Message.timestamp.desc()).limit(5).all()
+        
+        # Add chat history
+        for msg in reversed(chat_history):
+            formatted_messages.extend([
+                {"role": "user", "content": msg.user_query},
+                {"role": "assistant", "content": msg.ai_response}
+            ])
+        
+        # Add current message
+        formatted_messages.append({"role": "user", "content": current_message})
+        return formatted_messages
+        
+    except Exception as e:
+        logging.error(f"Error preparing chat context: {str(e)}")
+        # Fallback to basic context if there's an error
+        return [{"role": "user", "content": current_message}]
 
 def get_ai_response(formatted_messages: list, model: str) -> str:
     """Get response from OpenAI API."""

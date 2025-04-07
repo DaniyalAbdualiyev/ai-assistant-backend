@@ -5,6 +5,7 @@ from typing import Optional, Dict
 class IntegrationBase(BaseModel):
     platform: str
     credentials: Optional[Dict] = None
+    assistant_id: int
 
 class IntegrationCreate(IntegrationBase):
     pass
