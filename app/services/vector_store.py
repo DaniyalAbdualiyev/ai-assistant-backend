@@ -23,8 +23,8 @@ if index_name not in pc.list_indexes().names():
         metric='cosine',
         spec={
             "serverless": {
-                "cloud": "aws",
-                "region": "aws-us-west-2-free"
+                "cloud": "gcp",
+                "region": "gcp-starter"
             }
         }
     )
