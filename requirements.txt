@@ -13,3 +13,4 @@ email-validator
 PyPDF2
 python-docx
 python-multipart
+pinecone-client
