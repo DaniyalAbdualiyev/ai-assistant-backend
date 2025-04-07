@@ -24,7 +24,7 @@ if index_name not in pc.list_indexes().names():
         spec={
             "serverless": {
                 "cloud": "gcp",
-                "region": "gcp-starter"
+                "region": "us-west1-gcp-free"
             }
         }
     )
