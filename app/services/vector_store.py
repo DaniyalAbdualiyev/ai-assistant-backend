@@ -24,7 +24,7 @@ if index_name not in pc.list_indexes().names():
         spec={
             "serverless": {
                 "cloud": "aws",
-                "region": "us-west-2"
+                "region": "aws-us-west-2-free"
             }
         }
     )
