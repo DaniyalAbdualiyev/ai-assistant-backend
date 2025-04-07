@@ -1,7 +1,7 @@
 from typing import List, Dict
 from openai import OpenAI
 import os
-import pinecone
+from pinecone import Pinecone
 import uuid
 from dotenv import load_dotenv
 
@@ -12,22 +12,19 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Initialize Pinecone
-pinecone.init(
-    api_key=os.getenv("PINECONE_API_KEY"),
-    environment=os.getenv("PINECONE_ENVIRONMENT", "gcp-starter")
-)
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
 # Create or connect to the index
 index_name = "business-knowledge-base"
-if index_name not in pinecone.list_indexes():
-    pinecone.create_index(
+if index_name not in pc.list_indexes().names():
+    pc.create_index(
         name=index_name,
         dimension=1536,  # OpenAI's text-embedding-ada-002 dimension
-        metric="cosine"
+        metric='cosine'
     )
 
 # Connect to the index
-index = pinecone.Index(index_name)
+index = pc.Index(index_name)
 
 def store_embeddings(text: str) -> str:
     try:
