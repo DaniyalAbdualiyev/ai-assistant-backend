@@ -20,7 +20,13 @@ if index_name not in pc.list_indexes().names():
     pc.create_index(
         name=index_name,
         dimension=1536,  # OpenAI's text-embedding-ada-002 dimension
-        metric='cosine'
+        metric='cosine',
+        spec={
+            "serverless": {
+                "cloud": "aws",
+                "region": "us-west-2"
+            }
+        }
     )
 
 # Connect to the index
