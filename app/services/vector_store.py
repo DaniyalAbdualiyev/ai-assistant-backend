@@ -1,7 +1,7 @@
 from typing import List, Dict
 from openai import OpenAI
 import os
-from pinecone import Pinecone
+from pinecone import Pinecone, ServerlessSpec
 import uuid
 from dotenv import load_dotenv
 
@@ -21,12 +21,10 @@ if index_name not in pc.list_indexes().names():
         name=index_name,
         dimension=1536,  # OpenAI's text-embedding-ada-002 dimension
         metric='cosine',
-        spec={
-            "serverless": {
-                "cloud": "gcp",
-                "region": "us-west1-gcp"
-            }
-        }
+        spec=ServerlessSpec(
+            cloud="aws",
+            region="us-east-1"
+        )
     )
 
 # Connect to the index
