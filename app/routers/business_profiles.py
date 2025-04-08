@@ -1,83 +1,205 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import json
+from app.dependencies import get_db, get_current_user
 from app.models.business_profile import BusinessProfile
 from app.models.assistant import AIAssistant
-from app.schemas.business_profile import BusinessProfileCreate, BusinessProfileResponse
-from app.dependencies import get_current_user, get_db
-from app.services.file_processor import process_file
-from app.services.vector_store import store_embeddings
+from app.schemas.business_profile import (
+    BusinessProfileCreate,
+    BusinessProfileUpdate,
+    BusinessProfileResponse,
+    FileUploadResponse,
+    KnowledgeBaseUpdate
+)
+from app.services.file_processor import FileProcessor
+from app.services.vector_store import add_to_knowledge_base
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
-@router.post("/create", response_model=BusinessProfileResponse)
+@router.post("/", response_model=BusinessProfileResponse)
 async def create_business_profile(
     profile: BusinessProfileCreate,
-    assistant_id: int,
-    current_user = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
 ):
-    # Verify assistant ownership
-    assistant = db.query(AIAssistant).filter(
-        AIAssistant.id == assistant_id,
-        AIAssistant.user_id == current_user.id
-    ).first()
-    
-    if not assistant:
-        raise HTTPException(status_code=404, detail="Assistant not found")
+    """
+    Create a new business profile with questionnaire answers
+    """
+    try:
+        # Create AI Assistant first
+        assistant = AIAssistant(
+            name=f"{profile.business_name} Assistant",
+            model="gpt-4",  # Default model
+            language=profile.language,
+            user_id=current_user.id
+        )
+        db.add(assistant)
+        db.commit()
+        db.refresh(assistant)
 
-    # Create business profile
-    new_profile = BusinessProfile(
-        assistant_id=assistant_id,
-        business_name=profile.business_name,
-        business_type=profile.business_type,
-        tone_preferences=profile.tone_preferences
-    )
-    
-    db.add(new_profile)
-    db.commit()
-    db.refresh(new_profile)
-    return new_profile
+        # Create Business Profile
+        db_profile = BusinessProfile(
+            **profile.dict(exclude={'tone_preferences'}),
+            tone_preferences=profile.tone_preferences.dict(),
+            assistant_id=assistant.id
+        )
+        db.add(db_profile)
+        db.commit()
+        db.refresh(db_profile)
 
-@router.post("/upload/{profile_id}")
-async def upload_business_documents(
+        return db_profile
+
+    except Exception as e:
+        logger.error(f"Error creating business profile: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{profile_id}/upload", response_model=FileUploadResponse)
+async def upload_business_file(
     profile_id: int,
     file: UploadFile = File(...),
-    current_user = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
 ):
-    # Validate file type
-    if not file.filename.endswith(('.pdf', '.docx', '.txt')):
-        raise HTTPException(
-            status_code=400,
-            detail="Unsupported file type. Please upload PDF, DOCX, or TXT files."
+    """
+    Upload a file for business knowledge base
+    """
+    try:
+        # Verify profile ownership
+        profile = db.query(BusinessProfile).filter(
+            BusinessProfile.id == profile_id,
+            AIAssistant.user_id == current_user.id
+        ).join(AIAssistant).first()
+
+        if not profile:
+            raise HTTPException(status_code=404, detail="Business profile not found")
+
+        # Process file
+        processor = FileProcessor()
+        file_content = await file.read()
+        processed_content = await processor.process_file(file_content, file.filename)
+
+        # Update knowledge base
+        if not profile.knowledge_base:
+            profile.knowledge_base = {"files": []}
+        
+        file_metadata = {
+            "filename": file.filename,
+            "content_type": file.content_type,
+            "size": len(file_content),
+            "processed": True
+        }
+        
+        profile.knowledge_base["files"].append(file_metadata)
+        db.commit()
+
+        # Add to vector store
+        add_to_knowledge_base(
+            texts=[processed_content],
+            metadata=[{"source": file.filename, "type": "file"}],
+            namespace=f"business_{profile_id}"
         )
-    
-    # Get business profile
-    profile = db.query(BusinessProfile).join(AIAssistant).filter(
+
+        return FileUploadResponse(
+            file_id=str(len(profile.knowledge_base["files"]) - 1),
+            **file_metadata
+        )
+
+    except Exception as e:
+        logger.error(f"Error uploading file: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{profile_id}/knowledge-base", response_model=BusinessProfileResponse)
+async def update_knowledge_base(
+    profile_id: int,
+    update: KnowledgeBaseUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Add or update knowledge base content
+    """
+    try:
+        # Verify profile ownership
+        profile = db.query(BusinessProfile).filter(
+            BusinessProfile.id == profile_id,
+            AIAssistant.user_id == current_user.id
+        ).join(AIAssistant).first()
+
+        if not profile:
+            raise HTTPException(status_code=404, detail="Business profile not found")
+
+        # Update knowledge base
+        if not profile.knowledge_base:
+            profile.knowledge_base = {"texts": []}
+        
+        profile.knowledge_base["texts"].append({
+            "content": update.content,
+            "source": update.source,
+            "type": update.type
+        })
+        
+        db.commit()
+
+        # Add to vector store
+        add_to_knowledge_base(
+            texts=[update.content],
+            metadata=[{"source": update.source, "type": update.type}],
+            namespace=f"business_{profile_id}"
+        )
+
+        return profile
+
+    except Exception as e:
+        logger.error(f"Error updating knowledge base: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{profile_id}", response_model=BusinessProfileResponse)
+async def get_business_profile(
+    profile_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Get business profile details
+    """
+    profile = db.query(BusinessProfile).filter(
         BusinessProfile.id == profile_id,
         AIAssistant.user_id == current_user.id
-    ).first()
-    
+    ).join(AIAssistant).first()
+
     if not profile:
         raise HTTPException(status_code=404, detail="Business profile not found")
-    
-    try:
-        # Process the uploaded file
-        processed_data = await process_file(file)
-        if not processed_data:
-            raise HTTPException(status_code=400, detail="Could not extract text from file")
-        
-        # Store embeddings in vector database
-        knowledge_base_id = store_embeddings(processed_data)
-        
-        # Update business profile with knowledge base reference
-        profile.knowledge_base = {"id": knowledge_base_id}
-        db.commit()
-        
-        return {"message": "File processed successfully"}
-        
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e)) 
+
+    return profile
+
+@router.put("/{profile_id}", response_model=BusinessProfileResponse)
+async def update_business_profile(
+    profile_id: int,
+    profile_update: BusinessProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Update business profile details
+    """
+    db_profile = db.query(BusinessProfile).filter(
+        BusinessProfile.id == profile_id,
+        AIAssistant.user_id == current_user.id
+    ).join(AIAssistant).first()
+
+    if not db_profile:
+        raise HTTPException(status_code=404, detail="Business profile not found")
+
+    update_data = profile_update.dict(exclude_unset=True)
+    if "tone_preferences" in update_data:
+        update_data["tone_preferences"] = update_data["tone_preferences"].dict()
+
+    for key, value in update_data.items():
+        setattr(db_profile, key, value)
+
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile 

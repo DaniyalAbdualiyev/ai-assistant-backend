@@ -14,5 +14,6 @@ class AIAssistant(Base):
     user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
 
     # Relationships
-    owner = relationship("User", back_populates="assistants")
+    user = relationship("User", back_populates="assistants")
     messages = relationship("Message", back_populates="assistant")
+    business_profile = relationship("BusinessProfile", back_populates="assistant", uselist=False)
