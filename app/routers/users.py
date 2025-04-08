@@ -9,6 +9,15 @@ from app.dependencies import get_current_user, get_db
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Remove the get_db() function
+
+
+    
+
+    
+    
+    
+    
 # Dependency to get database session
 def get_db():
     db = SessionLocal()

@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
 from typing import List
-from app.database import SessionLocal
 from app.models.assistant import AIAssistant
 from app.schemas.assistant import AssistantCreate, AssistantResponse, AssistantQuery
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_db
 from app.services.ai_service import AIService
 from PyPDF2 import PdfReader
 import io

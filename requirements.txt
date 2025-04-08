@@ -1,6 +1,7 @@
 uvicorn
 fastapi
 pydantic
+pydantic-settings
 sqlalchemy
 psycopg2-binary
 passlib[bcrypt]
@@ -9,3 +10,10 @@ python-jose[cryptography]
 openai
 pytest
 pytest-asyncio
+stripe
+requests
+email-validator
+PyPDF2
+python-docx
+python-multipart
+pinecone

@@ -2,11 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from app.database import Base, engine
-from app.routers.users import router as user_router
-from app.routers.auth import router as auth_router
-from app.routers.assistants import router as assistants_router
-from app.routers.messages import router as messages_router
+from app.routers import users, auth, assistants, messages, payments,business_profiles,integrations,webhook,whatsapp_verification
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
 # Initialize HTTP Bearer scheme
 security_scheme = HTTPBearer()
@@ -17,12 +17,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Get allowed origins from environment variable or use default
+origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins (you can specify your frontend URL)
+    allow_origins=origins,  # Use the origins from environment variable
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all HTTP methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
 )
 
 # Create database tables
@@ -30,7 +33,12 @@ Base.metadata.create_all(bind=engine)
 
 
 # Include routers
-app.include_router(auth_router, prefix="/auth", tags=["Auth"])
-app.include_router(user_router, prefix="/users", tags=["Users"])
-app.include_router(assistants_router, prefix="/assistants", tags=["Assistants"])
-app.include_router(messages_router, prefix="/messages", tags=["Messages"]) 
+app.include_router(auth, prefix="/auth", tags=["Auth"])
+app.include_router(users, prefix="/users", tags=["Users"])
+app.include_router(assistants, prefix="/assistants", tags=["Assistants"])
+app.include_router(messages, prefix="/messages", tags=["Messages"])
+app.include_router(payments, prefix="/payments")  # The tags are already defined in the router
+app.include_router(business_profiles, prefix="/business", tags=["Business Profiles"])
+app.include_router(integrations, prefix="/integrations", tags=["Integrations"])
+app.include_router(webhook, tags=["Webhooks"])
+app.include_router(whatsapp_verification, prefix="/whatsapp", tags=["WhatsApp"])
