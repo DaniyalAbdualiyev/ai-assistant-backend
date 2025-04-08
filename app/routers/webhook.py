@@ -7,7 +7,7 @@ import logging
 from fastapi import BackgroundTasks
 from datetime import datetime
 from app.services.whatsapp import WhatsAppService
-from app.models.ai_assistant import AIAssistant
+from app.models.assistant import AIAssistant
 from app.models.business_profile import BusinessProfile
 from app.models.user import User
 from app.models.message import Message
