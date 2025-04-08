@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from app.database import Base, engine
-from app.routers import users, auth, assistants, messages, payments,business_profiles,integrations,webhook
+from app.routers import users, auth, assistants, messages, payments,business_profiles,integrations,webhook,whatsapp_verification
 import os
 from dotenv import load_dotenv
 
@@ -41,3 +41,4 @@ app.include_router(payments, prefix="/payments")  # The tags are already defined
 app.include_router(business_profiles, prefix="/business", tags=["Business Profiles"])
 app.include_router(integrations, prefix="/integrations", tags=["Integrations"])
 app.include_router(webhook, tags=["Webhooks"])
+app.include_router(whatsapp_verification, prefix="/whatsapp", tags=["WhatsApp"])
