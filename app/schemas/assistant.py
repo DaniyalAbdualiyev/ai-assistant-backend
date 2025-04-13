@@ -16,4 +16,9 @@ class AssistantResponse(AssistantBase):
 
     class Config:
         from_attributes = True
+
+class AssistantQuery(BaseModel):
+    text: str
+    tone: str = "normal"  # Can be "normal", "expert", or "simple"
+    business_type: str = "selling"
     
