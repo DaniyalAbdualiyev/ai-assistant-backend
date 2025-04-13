@@ -3,12 +3,26 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 import os
+import logging
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Get JWT configs with fallback values
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "54e27b1d9448f232ea0569ae84109e878d9f266d0f24923902cdcf2316c747fa")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+
+# Log JWT configuration status
+if not os.getenv("JWT_SECRET_KEY"):
+    logger.warning("JWT_SECRET_KEY environment variable not set, using default value")
+if not os.getenv("ALGORITHM"):
+    logger.warning("ALGORITHM environment variable not set, using default value")
+if not os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"):
+    logger.warning("ACCESS_TOKEN_EXPIRE_MINUTES environment variable not set, using default value")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

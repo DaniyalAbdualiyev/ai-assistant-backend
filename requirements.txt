@@ -6,3 +6,11 @@ psycopg2-binary
 passlib[bcrypt]
 python-dotenv
 python-jose[cryptography]
+openai
+stripe
+requests
+email-validator
+PyPDF2
+python-docx
+python-multipart
+pinecone
