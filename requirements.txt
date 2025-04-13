@@ -16,3 +16,6 @@ PyPDF2
 python-docx
 python-multipart
 pinecone
+langchain_openai
+langchain_core
+langchain_community
