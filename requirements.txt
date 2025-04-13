@@ -7,6 +7,8 @@ passlib[bcrypt]
 python-dotenv
 python-jose[cryptography]
 openai
+pytest
+pytest-asyncio
 stripe
 requests
 email-validator

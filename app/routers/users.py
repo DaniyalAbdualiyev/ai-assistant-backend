@@ -18,3 +18,10 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     
     
     
+# Dependency to get database session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
