@@ -2,8 +2,8 @@ from pydantic import BaseModel
 from datetime import datetime
 
 class AssistantBase(BaseModel):
-    name: str
-    model: str
+    name: str = "Assistant"
+    model: str = "gpt-3.5-turbo"
     language: str = "en"
 
 class AssistantCreate(AssistantBase):
