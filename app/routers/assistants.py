@@ -79,7 +79,8 @@ async def chat_with_assistant(
 
     config = {
         "language": assistant.language,
-        "tone": query.tone if hasattr(query, 'tone') and query.tone else "normal"
+        "tone": query.tone if hasattr(query, 'tone') and query.tone else "normal",
+        "business_type": "selling"
     }
 
     try:
