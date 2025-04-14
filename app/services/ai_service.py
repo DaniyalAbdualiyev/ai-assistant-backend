@@ -11,6 +11,26 @@ from datetime import datetime
 
 load_dotenv()
 
+# Add this function to determine temperature based on business type
+def get_business_temperature(business_type: str) -> float:
+    """
+    Return appropriate temperature for each business type.
+    - Higher temperature (0.7-0.9): More creative, varied responses
+    - Medium temperature (0.5-0.7): Balanced responses
+    - Lower temperature (0.2-0.4): More deterministic, precise responses
+    """
+    temperature_mapping = {
+        "selling": 0.8,        # More creative, varied for sales pitches
+        "consulting": 0.6,     # Balanced approach for consulting
+        "tech_support": 0.3,   # More precise, deterministic for technical information
+        "customer_service": 0.5,  # Middle ground for customer service
+        "healthcare": 0.4,     # More precise but still conversational
+        "legal": 0.2,          # Highly precise for legal advice
+        "creative": 0.9,       # Very creative for content generation
+        "educational": 0.5     # Balanced for educational content
+    }
+    return temperature_mapping.get(business_type, 0.7)  # Default to 0.7 if type not found
+
 class ContextManager:
     def __init__(self, db_session=None):
         self.db = db_session
@@ -32,6 +52,28 @@ class PromptEngine:
     def create_prompt(self, query: str, config: dict, context: str = "") -> str:
         """Create optimized prompt based on business type and configuration"""
         business_type = config.get('business_type', 'selling')
+        language = config.get('language', 'en')
+        
+        # Language instruction mapping
+        language_instructions = {
+            "en": "Respond in English.",
+            "ru": "Отвечайте на русском языке.",
+            "es": "Responda en español.",
+            "fr": "Répondez en français.",
+            "de": "Antworten Sie auf Deutsch.",
+            "zh": "用中文回答。",
+            "ja": "日本語で回答してください。",
+            "ar": "الرجاء الرد باللغة العربية.",
+            "hi": "कृपया हिंदी में जवाब दें।",
+            "pt": "Responda em português."
+            # Add more languages as needed
+        }
+        
+        # Get specific language instruction or default to a general format
+        language_instruction = language_instructions.get(
+            language, 
+            f"Respond in {language} language only. Do not use English unless specifically asked."
+        )
         
         type_instructions = {
             "selling": """
@@ -64,7 +106,9 @@ class PromptEngine:
         
         IMPORTANT INSTRUCTIONS:
         {type_instructions.get(business_type, '')}
-        Language: {config.get('language', 'en')}
+        
+        LANGUAGE INSTRUCTION: {language_instruction}
+        You MUST respond ONLY in {language} language. This is mandatory.
         
         User Query: {query}
         
@@ -72,6 +116,7 @@ class PromptEngine:
         1. Stay in character as a {business_type} specialist
         2. Include required keywords and information
         3. Be specific and actionable
+        4. Respond ONLY in {language} language
         """
 
         # Add tone modifications
@@ -83,12 +128,25 @@ class PromptEngine:
         return prompt
 
 class ResponseGenerator:
-    def __init__(self, model: ChatOpenAI):
+    def __init__(self, model: ChatOpenAI, api_key: str = None):
         self.model = model
+        # Store API key directly or get from environment if not provided
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
     
-    async def generate_response(self, prompt: str) -> str:
+    async def generate_response(self, prompt: str, temperature: float = None) -> str:
+        """Generate response with optional temperature override."""
         try:
-            response = await self.model.ainvoke(prompt)
+            # If temperature is specified, create a new model with that temperature
+            if temperature is not None:
+                temp_model = ChatOpenAI(
+                    api_key=self.api_key,
+                    temperature=temperature
+                )
+                response = await temp_model.ainvoke(prompt)
+            else:
+                # Use the default model
+                response = await self.model.ainvoke(prompt)
+                
             return response.content
         except Exception as e:
             return f"I apologize, but I'm having trouble generating a response. {str(e)}"
@@ -130,13 +188,14 @@ class ResponseOptimizer:
 class AIService:
     def __init__(self):
         self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = ChatOpenAI(api_key=self.api_key)
+        self.model = ChatOpenAI(api_key=self.api_key, temperature=0.7)
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
         self.vector_store = None
         self.conversations = {}  # Store by assistant_id
         self.context_manager = ContextManager()
         self.prompt_engine = PromptEngine()
-        self.response_generator = ResponseGenerator(self.model)
+        # Pass API key to ResponseGenerator
+        self.response_generator = ResponseGenerator(self.model, self.api_key)
         self.response_optimizer = ResponseOptimizer()
 
     def initialize_knowledge_base(self, documents):
@@ -147,6 +206,13 @@ class AIService:
 
     async def get_response(self, query, config, assistant_id, user_id):
         try:
+            # Get business type
+            business_type = config.get('business_type', 'selling')
+            
+            # Get appropriate temperature for this business type
+            # Use config temperature if provided, otherwise get from business type mapping
+            temperature = config.get('temperature', get_business_temperature(business_type))
+            
             # Get vector store context if available
             context = ""
             if self.vector_store:
@@ -160,8 +226,8 @@ class AIService:
                 context=context
             )
 
-            # Generate response
-            response = await self.response_generator.generate_response(prompt)
+            # Generate response with business-specific temperature
+            response = await self.response_generator.generate_response(prompt, temperature)
 
             # Optimize based on business type
             if config['business_type'] == 'selling':
@@ -169,7 +235,7 @@ class AIService:
             elif config['business_type'] == 'consulting':
                 response = self.response_optimizer.optimize_consulting_response(response)
 
-            # Store in conversation history (keeping your existing logic)
+            # Store in conversation history
             conversation_key = f"{assistant_id}_{user_id}"
             if conversation_key not in self.conversations:
                 self.conversations[conversation_key] = []
@@ -220,9 +286,11 @@ class MessageProcessor:
     async def process_message(self, message: str, platform: str, assistant_id: int, user_id: int) -> dict:
         """Process and format messages for different platforms"""
         # Get base response from AI service
+        # Note: We're not changing the default config here to maintain backward compatibility
+        # but the AIService will use the appropriate temperature for the business type
         response = await self.ai_service.get_response(
             query=message,
-            config={"business_type": "selling", "language": "en"},  # Default config
+            config={"business_type": "selling", "language": "en"},
             assistant_id=assistant_id,
             user_id=user_id
         )
@@ -275,3 +343,15 @@ async def instagram_webhook(data: dict):
 async def whatsapp_webhook(data: dict):
     """Handle WhatsApp webhook events"""
     # Similar handling for WhatsApp
+
+def get_default_temperature(business_type: str) -> float:
+    """Get default temperature based on business type"""
+    default_temperatures = {
+        "selling": 0.8,       # More creative for sales
+        "consulting": 0.6,    # Balanced for consulting
+        "tech_support": 0.3,  # More focused for technical support
+        "customer_service": 0.5,  # Balanced for service
+        "legal": 0.2,         # More precise for legal
+        "healthcare": 0.4     # Careful but still conversational for healthcare
+    }
+    return default_temperatures.get(business_type, 0.7)  # Default to 0.7

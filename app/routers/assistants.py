@@ -71,10 +71,13 @@ async def chat_with_assistant(
     if not assistant:
         raise HTTPException(status_code=404, detail="Assistant not found")
 
+    # Use query language if provided, otherwise use assistant's default language
+    language = query.language if query.language else assistant.language
+
     config = {
-        "language": assistant.language,
+        "language": language,
         "tone": query.tone if hasattr(query, 'tone') and query.tone else "normal",
-        "business_type": "selling"
+        "business_type": query.business_type if hasattr(query, 'business_type') else "selling"
     }
 
     try:

@@ -1,5 +1,5 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.models.assistant import AIAssistant
 from app.models.message import Message
@@ -13,6 +13,7 @@ from datetime import datetime
 from app.models.business_profile import BusinessProfile
 from app.services.vector_store import search_similar_texts
 import logging
+from app.services.ai_service import get_business_temperature
 
 
 load_dotenv()
@@ -27,6 +28,7 @@ router = APIRouter()
 @router.post("/chat", response_model=MessageResponse)
 async def chat_with_ai(
     message: MessageCreate,
+    temperature: Optional[float] = Query(None, ge=0.0, le=2.0, description="Response creativity (0.0-2.0)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -55,7 +57,11 @@ async def chat_with_ai(
         formatted_messages = prepare_chat_context(assistant.id, message.content, db)
         
         # Step 4: Get AI response
-        ai_response = get_ai_response(formatted_messages, assistant.model)
+        # Get the business type from assistant profile if available
+        business_type = getattr(assistant, 'business_type', 'selling')
+        
+        # Get AI response with business-type specific temperature
+        ai_response = get_ai_response(formatted_messages, assistant.model, business_type)
         
         # Step 5: Save and return AI response
         return save_and_format_response(db_message, ai_response, db)
@@ -137,13 +143,16 @@ def prepare_chat_context(assistant_id: int, current_message: str, db: Session) -
         # Fallback to basic context if there's an error
         return [{"role": "user", "content": current_message}]
 
-def get_ai_response(formatted_messages: list, model: str) -> str:
-    """Get response from OpenAI API."""
+def get_ai_response(formatted_messages: list, model: str, business_type: str = "selling") -> str:
+    """Get response from OpenAI API with temperature based on business type."""
     try:
+        # Get appropriate temperature for this business type
+        temperature = get_business_temperature(business_type)
+        
         response = client.chat.completions.create(
             model=model,
             messages=formatted_messages,
-            temperature=0.7,
+            temperature=temperature,  # Use business-type specific temperature
             max_tokens=1000
         )
         return response.choices[0].message.content if response.choices else "AI could not generate a response"
@@ -346,3 +355,13 @@ async def clear_chat_history(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+def get_business_temperature(business_type: str) -> float:
+    """Get appropriate temperature for different business types"""
+    temperature_map = {
+        "selling": 0.8,        # More creative for sales
+        "consulting": 0.6,     # Balanced for consulting
+        "tech_support": 0.3,   # More precise for support
+        "customer_service": 0.5  # Middle ground
+    }
+    return temperature_map.get(business_type, 0.7)  # Default to 0.7
