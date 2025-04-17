@@ -5,7 +5,7 @@ from app.models.message import Message
 import os
 from dotenv import load_dotenv
 import json
-from fastapi import APIRouter
+
 from typing import Dict, List
 from datetime import datetime
 
@@ -228,50 +228,17 @@ class MessageProcessor:
         )
 
         # Format response based on platform
-        if platform == "instagram":
-            # Instagram has a 2000 character limit
-            response = response[:1997] + "..." if len(response) > 2000 else response
-            return {"text": response, "platform": "instagram"}
-        
-        elif platform == "whatsapp":
-            # WhatsApp formatting
-            return {"text": response, "platform": "whatsapp"}
-        
-        # Default formatting
-        return {"text": response, "platform": "default"}
+        # Web-based chat formatting
+        return {"text": response, "platform": "web"}
 
 class ResponseFormatter:
     @staticmethod
-    def format_for_instagram(response_text, **kwargs):
-        """Format AI response for Instagram"""
-        # Instagram has 2000 character limit
-        if len(response_text) > 1950:
-            response_text = response_text[:1950] + "..."
-            
-        # Add call-to-action buttons if needed
+    def format_for_web(response_text, **kwargs):
+        """Format AI response for web-based chat"""
+        # Add any web-specific formatting here
         buttons = kwargs.get('buttons', [])
         
         return {
             "text": response_text,
             "buttons": buttons
         }
-    
-    @staticmethod
-    def format_for_whatsapp(response_text, **kwargs):
-        """Format AI response for WhatsApp"""
-        # Similar formatting but with WhatsApp-specific features
-
-router = APIRouter()
-
-@router.post("/webhooks/instagram")
-async def instagram_webhook(data: dict):
-    """Handle Instagram webhook events"""
-    # Extract message content
-    # Identify assistant and user
-    # Process message
-    # Return response
-    
-@router.post("/webhooks/whatsapp")
-async def whatsapp_webhook(data: dict):
-    """Handle WhatsApp webhook events"""
-    # Similar handling for WhatsApp

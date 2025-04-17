@@ -1,5 +1,11 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Dict, Optional
+
+class BusinessProfileBase(BaseModel):
+    business_name: str
+    business_type: str
+    tone_preferences: Dict[str, str]
 
 class AssistantBase(BaseModel):
     name: str = "Assistant"
@@ -7,12 +13,23 @@ class AssistantBase(BaseModel):
     language: str = "en"
 
 class AssistantCreate(AssistantBase):
-    pass
+    business_profile: Optional[BusinessProfileBase] = None
+
+class BusinessProfileResponse(BaseModel):
+    id: int
+    business_name: str
+    business_type: str
+    unique_id: str
+
+    class Config:
+        from_attributes = True
 
 class AssistantResponse(AssistantBase):
     id: int
     user_id: int
     created_at: datetime
+    business_profile: Optional[BusinessProfileResponse] = None
+    chat_url: Optional[str] = None
 
     class Config:
         from_attributes = True
