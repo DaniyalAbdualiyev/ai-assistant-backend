@@ -103,7 +103,14 @@ def prepare_chat_context(assistant_id: int, current_message: str, db: Session) -
         
         # If we have a business profile with knowledge base, search for relevant information
         if business_profile and business_profile.knowledge_base:
-            relevant_docs = search_similar_texts(current_message)
+            # Get the namespace from the business profile
+            namespace = business_profile.knowledge_base.get('namespace')
+            if not namespace:
+                # Fallback to a default namespace format if not stored
+                namespace = f"business_{business_profile.id}"
+                
+            # Search for relevant documents using the business-specific namespace
+            relevant_docs = search_similar_texts(current_message, namespace=namespace)
             
             if relevant_docs:
                 # Add relevant business knowledge to context

@@ -3,8 +3,12 @@ from openai import OpenAI
 import os
 from pinecone import Pinecone, ServerlessSpec
 import uuid
+import logging
 from dotenv import load_dotenv
 from .embedding_service import EmbeddingService
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -40,7 +44,20 @@ def get_index_stats() -> Dict:
 def search_similar_texts(query: str, top_k: int = 5, namespace: str = None) -> List[Dict]:
     """
     Search for similar texts in the knowledge base
+    
+    Args:
+        query: The search query
+        top_k: Number of results to return
+        namespace: Optional namespace to search in (e.g., business_123)
+        
+    Returns:
+        List of matching documents with their similarity scores
     """
+    if namespace:
+        logger.info(f"Searching for similar texts in namespace: {namespace}")
+    else:
+        logger.info("Searching for similar texts without namespace specification")
+        
     return EmbeddingService.search_similar_texts(query, top_k, namespace=namespace)
 
 def add_to_knowledge_base(texts: List[str], metadata: List[Dict] = None, namespace: str = None):
@@ -53,13 +70,19 @@ def add_to_knowledge_base(texts: List[str], metadata: List[Dict] = None, namespa
 def store_embeddings(text: str, namespace: str = None) -> str:
     """
     Store a single text's embeddings in the knowledge base
+    
+    Args:
+        text: The text to store in the knowledge base
+        namespace: Optional namespace to store the embeddings in (e.g., business_123)
+        
+    Returns:
+        The ID of the stored document
     """
     try:
         # Generate embeddings using OpenAI
         response = client.embeddings.create(
             input=text,
-            model="text-embedding-ada-002",
-            encoding_format="float"
+            model="text-embedding-ada-002"
         )
         
         # Get the embeddings
@@ -75,8 +98,13 @@ def store_embeddings(text: str, namespace: str = None) -> str:
             "metadata": {"text": text}
         }
         
-        # Store in Pinecone
-        EmbeddingService.upsert_to_pinecone([vector], namespace=namespace)
+        # Store in Pinecone with namespace if provided
+        if namespace:
+            logger.info(f"Storing embeddings in namespace: {namespace}")
+            EmbeddingService.upsert_to_pinecone([vector], namespace=namespace)
+        else:
+            logger.info("Storing embeddings without namespace")
+            EmbeddingService.upsert_to_pinecone([vector])
         
         return doc_id
         

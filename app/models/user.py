@@ -14,4 +14,5 @@ class User(Base):
     is_admin = Column(Boolean, default=False, nullable=True)
 
     assistants = relationship("AIAssistant", back_populates="user", cascade="all, delete-orphan")
+    subscriptions = relationship("UserSubscription", back_populates="user")
     messages = relationship("Message", back_populates="user", cascade="all, delete-orphan")

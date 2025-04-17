@@ -3,12 +3,14 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from app.database import SessionLocal
 from app.models.payment import Payment
 from app.models.subscription_plans import SubscriptionPlan
+from app.models.user_subscription import UserSubscription
 from app.schemas.payment import PaymentResponse
 from app.schemas.subscription import (
     SubscriptionCreate, 
     SubscriptionResponse, 
     SubscriptionPlanResponse,
-    SubscriptionPlanCreate
+    SubscriptionPlanCreate,
+    UserSubscriptionResponse
 )
 from sqlalchemy.orm import Session
 import os
@@ -16,8 +18,10 @@ from dotenv import load_dotenv
 from typing import List
 from app.dependencies import get_db, get_current_user
 from app.models.user import User
+from app.middleware.admin_middleware import verify_admin
 import logging
 import time
+from datetime import datetime, timedelta
 
 load_dotenv()
 
@@ -36,7 +40,8 @@ logger = logging.getLogger(__name__)
 async def create_subscription(
     subscription: SubscriptionCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    test_mode: bool = True  # Enable test mode by default for development
 ):
     """Users can only create subscriptions for themselves"""
     if subscription.user_id != current_user.id:
@@ -81,7 +86,32 @@ async def create_subscription(
         )
         db.add(payment)
         db.commit()
+        db.refresh(payment)
         logger.info(f"Saved payment record for session {checkout_session.id}")
+        
+        # For testing/development: Automatically create subscription without waiting for webhook
+        if test_mode:
+            logger.info(f"Test mode enabled: Automatically creating subscription for user {current_user.id}")
+            # Update payment status to completed
+            payment.status = "completed"
+            
+            # Calculate subscription end date based on plan duration
+            start_date = datetime.utcnow()
+            end_date = start_date + timedelta(days=30 * plan.duration_months)
+            
+            # Create user subscription
+            subscription = UserSubscription(
+                user_id=current_user.id,
+                plan_id=plan.id,
+                payment_id=payment.id,
+                start_date=start_date,
+                end_date=end_date,
+                is_active=True
+            )
+            
+            db.add(subscription)
+            db.commit()
+            logger.info(f"Created test subscription for user {current_user.id} valid until {end_date}")
 
         end_time = time.time()
         logger.info(f"Subscription creation completed in {end_time - start_time:.2f} seconds")
@@ -116,7 +146,29 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         
         payment = db.query(Payment).filter(Payment.transaction_id == payment_id).first()
         if payment:
+            # Update payment status
             payment.status = "completed"
+            
+            # Get the subscription plan
+            plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == payment.plan_id).first()
+            
+            if plan:
+                # Calculate end date based on plan duration
+                start_date = datetime.utcnow()
+                end_date = start_date + timedelta(days=30 * plan.duration_months)
+                
+                # Create user subscription
+                subscription = UserSubscription(
+                    user_id=payment.user_id,
+                    plan_id=payment.plan_id,
+                    payment_id=payment.id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    is_active=True
+                )
+                
+                db.add(subscription)
+            
             db.commit()
             
     elif event["type"] == "payment_intent.payment_failed":
@@ -130,7 +182,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
             
     return {"status": "success"}
 
-@router.get("/subscriptions/{user_id}", response_model=List[PaymentResponse])
+@router.get("/subscriptions/{user_id}", response_model=List[UserSubscriptionResponse])
 async def get_user_subscriptions(
     user_id: int,
     current_user: User = Depends(get_current_user),
@@ -140,30 +192,48 @@ async def get_user_subscriptions(
     if user_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="You can only view your own subscriptions")
     
-    payments = db.query(Payment).filter(
-        Payment.user_id == user_id,
-        Payment.status == "completed"
+    subscriptions = db.query(UserSubscription).filter(
+        UserSubscription.user_id == user_id,
+        UserSubscription.is_active == True
     ).all()
     
-    if not payments:
-        raise HTTPException(status_code=404, detail="No subscriptions found")
+    if not subscriptions:
+        raise HTTPException(status_code=404, detail="No active subscriptions found")
         
-    return payments
+    return subscriptions
+
+@router.get("/subscriptions/{user_id}/active", response_model=bool)
+async def check_active_subscription(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Check if a user has an active subscription"""
+    # Only allow users to check their own subscription or admins to check any
+    if user_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="You can only check your own subscription")
+    
+    # Find active subscriptions that haven't expired
+    active_subscription = db.query(UserSubscription).filter(
+        UserSubscription.user_id == user_id,
+        UserSubscription.is_active == True,
+        UserSubscription.end_date >= datetime.utcnow()
+    ).first()
+    
+    return active_subscription is not None
 
 @router.post("/plans", response_model=SubscriptionPlanResponse)
 async def create_plan(
     plan: SubscriptionPlanCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(verify_admin),  # Use admin middleware
     db: Session = Depends(get_db)
 ):
     """Only admin users should be able to create plans"""
     logger.info("Starting create_plan endpoint")
     start_time = time.time()
 
-    # Check admin status
-    logger.info(f"Checking admin status for user {current_user.email}")
-    if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only admin users can create plans")
+    # Admin status is already verified by the verify_admin dependency
+    logger.info(f"Admin user {current_user.email} creating plan")
     
     try:
         # Create new plan

@@ -9,6 +9,7 @@ class BusinessProfileCreate(BaseModel):
 
 class BusinessProfileResponse(BusinessProfileCreate):
     id: int
+    unique_id: str
     assistant_id: int
     created_at: datetime
     knowledge_base: Optional[Dict] = None
