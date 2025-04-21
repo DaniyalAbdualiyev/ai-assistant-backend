@@ -22,3 +22,5 @@ langchain_community
 tenacity
 qrcode[pil]
 itsdangerous
+sqladmin
+chromadb
