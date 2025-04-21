@@ -21,3 +21,4 @@ langchain_core
 langchain_community
 tenacity
 qrcode[pil]
+itsdangerous
