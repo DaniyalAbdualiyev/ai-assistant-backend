@@ -4,6 +4,9 @@ from app.database import Base
 from datetime import datetime
 import uuid
 
+# Forward references for relationships
+from sqlalchemy.ext.declarative import declared_attr
+
 class BusinessProfile(Base):
     __tablename__ = "business_profiles"
 
@@ -16,5 +19,13 @@ class BusinessProfile(Base):
     assistant_id = Column(Integer, ForeignKey("assistants.id", ondelete="CASCADE"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Relationship with Assistant
-    assistant = relationship("AIAssistant", back_populates="business_profile") 
+    # Relationships
+    assistant = relationship("AIAssistant", back_populates="business_profile")
+    
+    @declared_attr
+    def analytics(cls):
+        return relationship("ConversationAnalytics", back_populates="business_profile")
+        
+    @declared_attr
+    def client_analytics(cls):
+        return relationship("ClientAnalytics", back_populates="business_profile")

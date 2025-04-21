@@ -1,9 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
+from starlette.middleware.sessions import SessionMiddleware
 from app.database import Base, engine
 from app.routers import users, auth, assistants, messages, payments, webhook
 from app.routers.web_chat import router as web_chat
+from app.routers.analytics import router as analytics
+from app.admin import setup_admin
+from app.admin.auth import AdminAuth
 
 import os
 from dotenv import load_dotenv
@@ -18,6 +22,9 @@ app = FastAPI(
     description="API for AI Assistant application",
     version="1.0.0"
 )
+
+# Add session middleware for admin authentication
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "your-secret-key"))
 
 # Get allowed origins from environment variable or use default
 origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
@@ -43,3 +50,8 @@ app.include_router(payments, prefix="/payments")  # The tags are already defined
 
 app.include_router(webhook, tags=["Webhooks"])
 app.include_router(web_chat, prefix="/web-chat", tags=["Web Chat"])
+app.include_router(analytics)
+
+# Setup SQLAdmin with authentication
+admin = setup_admin(app)
+admin.authentication_backend = AdminAuth(secret_key=os.getenv("SECRET_KEY", "your-secret-key"))

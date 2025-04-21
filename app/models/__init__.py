@@ -4,6 +4,7 @@ from app.models.message import Message
 from app.models.payment import Payment
 from app.models.subscription_plans import SubscriptionPlan
 from app.models.token import BlacklistedToken
+from app.models.analytics import ConversationAnalytics, ClientAnalytics
 
 __all__ = [
     'User',
@@ -11,5 +12,7 @@ __all__ = [
     'Message',
     'Payment',
     'SubscriptionPlan',
-    'BlacklistedToken'
+    'BlacklistedToken',
+    'ConversationAnalytics',
+    'ClientAnalytics'
 ]

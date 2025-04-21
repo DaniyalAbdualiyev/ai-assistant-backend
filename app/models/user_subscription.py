@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, ForeignKey, DateTime, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, declared_attr
 from app.database import Base
 from datetime import datetime, timedelta
 
@@ -15,9 +15,17 @@ class UserSubscription(Base):
     is_active = Column(Boolean, default=True)
     
     # Relationships
-    user = relationship("User", back_populates="subscriptions")
-    plan = relationship("SubscriptionPlan")
-    payment = relationship("Payment")
+    @declared_attr
+    def user(cls):
+        return relationship("User", back_populates="subscriptions")
+    
+    @declared_attr
+    def plan(cls):
+        return relationship("SubscriptionPlan")
+    
+    @declared_attr
+    def payment(cls):
+        return relationship("Payment")
 
     def __repr__(self):
         return f"<UserSubscription(user_id={self.user_id}, plan_id={self.plan_id}, active={self.is_active})>"
