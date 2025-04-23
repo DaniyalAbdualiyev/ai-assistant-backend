@@ -72,6 +72,9 @@ def create_assistant(
     
     # Add business profile and chat URL if available
     if business_profile:
+        # Ensure unique_id is a string
+        business_profile.unique_id = str(business_profile.unique_id)
+        
         response["business_profile"] = {
             "id": business_profile.id,
             "business_name": business_profile.business_name,
@@ -87,7 +90,15 @@ def create_assistant(
 
 @router.get("/", response_model=List[AssistantResponse])
 def get_assistants(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return db.query(AIAssistant).filter(AIAssistant.user_id == user.id).all()
+    assistants = db.query(AIAssistant).filter(AIAssistant.user_id == user.id).all()
+    
+    # Process each assistant to ensure UUID is converted to string
+    for assistant in assistants:
+        if assistant.business_profile:
+            # Ensure unique_id is a string
+            assistant.business_profile.unique_id = str(assistant.business_profile.unique_id)
+    
+    return assistants
 
 @router.get("/{assistant_id}")
 def get_assistant(assistant_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
@@ -108,6 +119,9 @@ def get_assistant(assistant_id: int, db: Session = Depends(get_db), user=Depends
     # If there's a business profile, include its details and chat link
     if assistant.business_profile:
         business_profile = assistant.business_profile
+        
+        # Ensure unique_id is a string
+        business_profile.unique_id = str(business_profile.unique_id)
         
         if business_profile:
             response["business_profile"] = {
@@ -263,6 +277,9 @@ async def upload_knowledge(
         # Generate chat path and full URL for the business profile
         chat_path = f"/web-chat/{business_profile.unique_id}"
         chat_url = f"{BASE_URL}{chat_path}"
+        
+        # Ensure unique_id is a string
+        business_profile.unique_id = str(business_profile.unique_id)
         
         return {
             "message": "Knowledge base updated successfully",

@@ -241,7 +241,9 @@ async def create_plan(
         new_plan = SubscriptionPlan(
             name=plan.name,
             price=plan.price,
-            features=plan.features
+            features=plan.features,
+            duration=plan.duration,
+            duration_months=plan.duration_months
         )
         db.add(new_plan)
         db.commit()
