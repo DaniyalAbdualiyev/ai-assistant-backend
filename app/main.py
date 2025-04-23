@@ -27,11 +27,12 @@ app = FastAPI(
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "your-secret-key"))
 
 # Get allowed origins from environment variable or use default
-origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+# Temporarily allow all origins for development
+origins = ["*"]  # This will allow requests from any origin
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Use the origins from environment variable
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
