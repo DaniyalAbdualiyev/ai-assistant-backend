@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize HTTP Bearer scheme
 security_scheme = HTTPBearer()
 
 app = FastAPI(
@@ -23,36 +22,29 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add session middleware for admin authentication
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "your-secret-key"))
 
-# Get allowed origins from environment variable or use default
-# Temporarily allow all origins for development
-origins = ["*"]  # This will allow requests from any origin
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# Create database tables
 Base.metadata.create_all(bind=engine)
 
-
-# Include routers
 app.include_router(auth, prefix="/auth", tags=["Auth"])
 app.include_router(users, prefix="/users", tags=["Users"])
 app.include_router(assistants, prefix="/assistants", tags=["Assistants"])
 app.include_router(messages, prefix="/messages", tags=["Messages"])
-app.include_router(payments, prefix="/payments")  # The tags are already defined in the router
+app.include_router(payments, prefix="/payments")
 
 app.include_router(webhook, tags=["Webhooks"])
 app.include_router(web_chat, prefix="/web-chat", tags=["Web Chat"])
 app.include_router(analytics)
 
-# Setup SQLAdmin with authentication
 admin = setup_admin(app)
 admin.authentication_backend = AdminAuth(secret_key=os.getenv("SECRET_KEY", "your-secret-key"))

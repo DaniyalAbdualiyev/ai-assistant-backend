@@ -97,18 +97,15 @@ class ResponseOptimizer:
     def optimize_sales_response(self, original_response: str) -> str:
         """Make responses more likely to lead to sales"""
         
-        # Add call-to-action
         if "price" in original_response.lower():
             original_response += "\nWould you like to proceed with the purchase? I can help you place an order right now."
             
-        # Add urgency when mentioning products
         if "product" in original_response.lower():
             original_response = original_response.replace(
                 "available",
                 "available now with special pricing"
             )
             
-        # Add social proof
         if "interested" in original_response.lower():
             original_response += "\nMany customers have found this option perfect for their needs."
             
@@ -117,11 +114,9 @@ class ResponseOptimizer:
     def optimize_consulting_response(self, original_response: str) -> str:
         """Make responses more likely to lead to consultations"""
         
-        # Add appointment suggestion
         if "help" in original_response.lower():
             original_response += "\nWould you like to schedule a free consultation to discuss this in detail?"
             
-        # Add expertise proof
         if "advice" in original_response.lower():
             original_response += "\nOur experts have helped over 100 clients with similar situations."
             
@@ -147,29 +142,24 @@ class AIService:
 
     async def get_response(self, query, config, assistant_id, user_id):
         try:
-            # Get vector store context if available
             context = ""
             if self.vector_store:
                 results = self.vector_store.similarity_search(query, k=2)
                 context = "\n".join([doc.page_content[:2000] for doc in results])
 
-            # Create optimized prompt
             prompt = self.prompt_engine.create_prompt(
                 query=query,
                 config=config,
                 context=context
             )
 
-            # Generate response
             response = await self.response_generator.generate_response(prompt)
 
-            # Optimize based on business type
             if config['business_type'] == 'selling':
                 response = self.response_optimizer.optimize_sales_response(response)
             elif config['business_type'] == 'consulting':
                 response = self.response_optimizer.optimize_consulting_response(response)
 
-            # Store in conversation history (keeping your existing logic)
             conversation_key = f"{assistant_id}_{user_id}"
             if conversation_key not in self.conversations:
                 self.conversations[conversation_key] = []
@@ -200,26 +190,12 @@ class AIService:
         response = await self.model.ainvoke(prompt)
         return json.loads(response.content)
 
-    async def generate_suggestions(self, conversation_history):
-        """Generate proactive suggestions based on conversation"""
-        # Analyze conversation
-        # Identify potential next steps
-        # Generate relevant suggestions
-
-    async def process_image_with_text(self, image_url, text_query):
-        """Process queries with both image and text"""
-        # Download image
-        # Extract image features
-        # Combine with text query
-        # Generate response
-
 class MessageProcessor:
     def __init__(self, ai_service: AIService):
         self.ai_service = ai_service
 
     async def process_message(self, message: str, platform: str, assistant_id: int, user_id: int) -> dict:
         """Process and format messages for different platforms"""
-        # Get base response from AI service
         response = await self.ai_service.get_response(
             query=message,
             config={"business_type": "selling", "language": "en"},  # Default config
@@ -227,15 +203,12 @@ class MessageProcessor:
             user_id=user_id
         )
 
-        # Format response based on platform
-        # Web-based chat formatting
         return {"text": response, "platform": "web"}
 
 class ResponseFormatter:
     @staticmethod
     def format_for_web(response_text, **kwargs):
         """Format AI response for web-based chat"""
-        # Add any web-specific formatting here
         buttons = kwargs.get('buttons', [])
         
         return {
