@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.models.assistant import AIAssistant
 from app.models.message import Message
@@ -10,8 +10,10 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import os
 from datetime import datetime
+import time
 from app.models.business_profile import BusinessProfile
 from app.services.vector_store import search_similar_texts
+from app.services.analytics_service import AnalyticsService
 import logging
 
 
@@ -23,11 +25,13 @@ if not client.api_key:
     raise ValueError("OPENAI_API_KEY not found in environment variables")
 
 router = APIRouter()
+analytics_service = AnalyticsService()
 
 @router.post("/chat", response_model=MessageResponse)
 async def chat_with_ai(
     message: MessageCreate,
     current_user: User = Depends(get_current_user),
+    request: Request = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -42,6 +46,28 @@ async def chat_with_ai(
     # Step 1: Verify assistant and user permissions
     assistant = verify_assistant_access(message.assistant_id, current_user.id, db)
     
+    # Get business profile for the assistant (if exists)
+    business_profile = db.query(BusinessProfile).filter(
+        BusinessProfile.assistant_id == assistant.id
+    ).first()
+    
+    # Generate a client session ID for analytics
+    client_session_id = f"user_{current_user.id}_assistant_{assistant.id}_{datetime.utcnow().strftime('%Y%m%d')}"
+    
+    # Record client session for analytics if it's the first message
+    client_ip = request.client.host if request and request.client else None
+    client_device = request.headers.get("User-Agent") if request else None
+    
+    if business_profile:
+        await analytics_service.record_client_session(
+            db=db,
+            client_session_id=client_session_id,
+            assistant_id=assistant.id,
+            business_profile_id=business_profile.id,
+            client_ip=client_ip,
+            client_device=client_device
+        )
+    
     # Step 2: Save user's message and create placeholder for AI response
     db_message = save_initial_message(
         user_query=message.content,
@@ -51,14 +77,38 @@ async def chat_with_ai(
     )
     
     try:
+        start_time = time.time()
+        
         # Step 3: Get and format chat history
         formatted_messages = prepare_chat_context(assistant.id, message.content, db)
         
         # Step 4: Get AI response
         ai_response = get_ai_response(formatted_messages, assistant.model)
         
+        # Calculate response time
+        response_time = time.time() - start_time
+        
         # Step 5: Save and return AI response
-        return save_and_format_response(db_message, ai_response, db)
+        response = save_and_format_response(db_message, ai_response, db)
+        
+        # Update analytics if there's a business profile
+        if business_profile:
+            # Count messages for this session
+            message_count = db.query(Message).filter(
+                Message.assistant_id == assistant.id,
+                Message.user_id == current_user.id
+            ).count()
+            
+            await analytics_service.record_analytics_direct(
+                db=db,
+                assistant_id=assistant.id,
+                business_profile_id=business_profile.id,
+                client_session_id=client_session_id,
+                message_count=message_count,
+                response_time=response_time
+            )
+        
+        return response
         
     except Exception as e:
         db.rollback()

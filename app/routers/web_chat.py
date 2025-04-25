@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 import uuid
 import json
 from datetime import datetime
+import time
 
 from app.dependencies import get_db, get_current_user
 from app.models.business_profile import BusinessProfile
@@ -11,6 +12,7 @@ from app.models.assistant import AIAssistant
 from app.models.user import User
 from app.schemas.message import MessageCreate, MessageResponse
 from app.routers.messages import prepare_chat_context, get_ai_response
+from app.services.analytics_service import AnalyticsService
 import logging
 
 # Set up logging
@@ -22,6 +24,9 @@ router = APIRouter()
 # Store chat sessions in memory (in production, this would be in a database)
 # Key: unique_id + client_id, Value: chat session data
 chat_sessions = {}
+
+# Initialize analytics service
+analytics_service = AnalyticsService()
 
 @router.post("/start-chat/{business_unique_id}")
 async def start_chat_session(
@@ -77,6 +82,7 @@ async def chat_with_business_assistant(
     business_unique_id: str,
     message: MessageCreate,
     client_id: Optional[str] = None,
+    request: Request = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -115,6 +121,19 @@ async def chat_with_business_assistant(
             "created_at": datetime.utcnow(),
             "messages": []
         }
+        
+        # Record client session for analytics
+        client_ip = request.client.host if request and request.client else None
+        client_device = request.headers.get("User-Agent") if request else None
+        
+        await analytics_service.record_client_session(
+            db=db,
+            client_session_id=client_id,
+            assistant_id=assistant.id,
+            business_profile_id=business_profile.id,
+            client_ip=client_ip,
+            client_device=client_device
+        )
     
     session = chat_sessions[session_key]
     
@@ -138,11 +157,16 @@ async def chat_with_business_assistant(
     })
     
     try:
+        start_time = time.time()
+        
         # Prepare chat context with business profile knowledge
         formatted_messages = prepare_chat_context(assistant.id, message.content, db)
         
         # Get AI response
         ai_response = get_ai_response(formatted_messages, assistant.model)
+        
+        # Calculate response time
+        response_time = time.time() - start_time
         
         # Store AI response in session
         session["messages"].append({
@@ -150,6 +174,17 @@ async def chat_with_business_assistant(
             "content": ai_response,
             "timestamp": datetime.utcnow().isoformat()
         })
+        
+        # Update analytics
+        message_count = len(session["messages"])
+        await analytics_service.record_analytics_direct(
+            db=db,
+            assistant_id=assistant.id,
+            business_profile_id=business_profile.id,
+            client_session_id=client_id,
+            message_count=message_count,
+            response_time=response_time
+        )
         
         # Return the response
         return {
