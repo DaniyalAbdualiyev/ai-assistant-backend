@@ -5,11 +5,10 @@ from datetime import datetime, timedelta
 
 from app.dependencies import get_db, get_current_user
 from app.models.user import User
-from app.models.analytics import ConversationAnalytics, ClientAnalytics
+from app.models.analytics import ConversationAnalytics
 from app.models.business_profile import BusinessProfile
 from app.models.assistant import AIAssistant
 from app.schemas.analytics import ConversationAnalytics as ConversationAnalyticsSchema
-from app.schemas.analytics import ClientAnalytics as ClientAnalyticsSchema
 from app.schemas.analytics import AnalyticsSummary, TimeRangeAnalytics
 from app.services.analytics_service import AnalyticsService
 

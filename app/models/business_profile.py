@@ -25,7 +25,3 @@ class BusinessProfile(Base):
     @declared_attr
     def analytics(cls):
         return relationship("ConversationAnalytics", back_populates="business_profile")
-        
-    @declared_attr
-    def client_analytics(cls):
-        return relationship("ClientAnalytics", back_populates="business_profile")

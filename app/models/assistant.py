@@ -24,7 +24,3 @@ class AIAssistant(Base):
     @declared_attr
     def analytics(cls):
         return relationship("ConversationAnalytics", back_populates="assistant")
-        
-    @declared_attr
-    def client_analytics(cls):
-        return relationship("ClientAnalytics", back_populates="assistant")
