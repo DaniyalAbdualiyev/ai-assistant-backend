@@ -5,7 +5,6 @@ from app.admin.views import (
     AIAssistantAdmin, 
     BusinessProfileAdmin, 
     ConversationAnalyticsAdmin,
-    ClientAnalyticsAdmin,
     MessageAdmin,
     SubscriptionPlanAdmin,
     UserSubscriptionAdmin
@@ -23,7 +22,6 @@ def setup_admin(app):
     admin.add_view(AIAssistantAdmin)
     admin.add_view(BusinessProfileAdmin)
     admin.add_view(ConversationAnalyticsAdmin)
-    admin.add_view(ClientAnalyticsAdmin)
     admin.add_view(MessageAdmin)
     admin.add_view(SubscriptionPlanAdmin)
     admin.add_view(UserSubscriptionAdmin)

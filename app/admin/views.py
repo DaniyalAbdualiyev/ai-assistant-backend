@@ -2,7 +2,7 @@ from sqladmin import ModelView
 from app.models.user import User
 from app.models.assistant import AIAssistant
 from app.models.business_profile import BusinessProfile
-from app.models.analytics import ConversationAnalytics, ClientAnalytics
+from app.models.analytics import ConversationAnalytics
 from app.models.message import Message
 from app.models.user_subscription import UserSubscription
 from app.models.subscription_plans import SubscriptionPlan
@@ -79,33 +79,6 @@ class ConversationAnalyticsAdmin(ModelView, model=ConversationAnalytics):
     can_view_details = True
     page_size = 25
     name_plural = "Conversation Analytics"
-
-
-class ClientAnalyticsAdmin(ModelView, model=ClientAnalytics):
-    name = "Client Analytics"
-    icon = "fa-solid fa-users-viewfinder"
-    category = "Analytics"
-    column_list = [
-        ClientAnalytics.id, 
-        ClientAnalytics.client_session_id, 
-        ClientAnalytics.assistant_id, 
-        ClientAnalytics.business_profile_id, 
-        ClientAnalytics.session_start, 
-        ClientAnalytics.session_end, 
-        ClientAnalytics.message_count
-    ]
-    column_sortable_list = [
-        ClientAnalytics.id, 
-        ClientAnalytics.session_start, 
-        ClientAnalytics.message_count
-    ]
-    column_searchable_list = [ClientAnalytics.client_session_id]
-    can_create = False  # Analytics should be created by the system
-    can_edit = False
-    can_delete = False
-    can_view_details = True
-    page_size = 25
-    name_plural = "Client Analytics"
 
 
 class MessageAdmin(ModelView, model=Message):
