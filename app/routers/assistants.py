@@ -186,10 +186,8 @@ def delete_assistant(assistant_id: int, db: Session = Depends(get_db), user=Depe
         raise HTTPException(status_code=404, detail="Assistant not found")
         
     # Delete business profile if it exists
-    if assistant.business_profile_id:
-        business_profile = db.query(BusinessProfile).filter(BusinessProfile.id == assistant.business_profile_id).first()
-        if business_profile:
-            db.delete(business_profile)
+    if hasattr(assistant, 'business_profile') and assistant.business_profile:
+        db.delete(assistant.business_profile)
 
     db.delete(assistant)
     db.commit()

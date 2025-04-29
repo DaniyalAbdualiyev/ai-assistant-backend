@@ -24,7 +24,15 @@ app = FastAPI(
 
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "your-secret-key"))
 
-origins = ["*"]
+# Configure CORS settings
+env = os.getenv("ENVIRONMENT", "local")
+if env == "production":
+    # In production, only allow specific origins
+    allowed_origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
+    origins = [origin.strip() for origin in allowed_origins if origin.strip()]
+else:
+    # In development/local environment, be more permissive
+    origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
