@@ -3,6 +3,9 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
 
+# Forward references for relationships
+from sqlalchemy.ext.declarative import declared_attr
+
 class AIAssistant(Base):
     __tablename__ = "assistants"  # Changed from "ai_assistants" to "assistants"
 
@@ -17,3 +20,7 @@ class AIAssistant(Base):
     user = relationship("User", back_populates="assistants")
     messages = relationship("Message", back_populates="assistant")
     business_profile = relationship("BusinessProfile", back_populates="assistant", uselist=False)
+    
+    @declared_attr
+    def analytics(cls):
+        return relationship("ConversationAnalytics", back_populates="assistant")

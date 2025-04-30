@@ -1,3 +1,4 @@
+Peakperformer, [4/30/2025 8:11 AM]
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.documents import Document
 from langchain_community.vectorstores import Chroma
@@ -32,7 +33,7 @@ def get_business_temperature(business_type: str) -> float:
     return temperature_mapping.get(business_type, 0.7)  # Default to 0.7 if type not found
 
 class ContextManager:
-    def __init__(self, db_session=None):
+    def init(self, db_session=None):
         self.db = db_session
         self.max_context_messages = 10
     
@@ -48,6 +49,7 @@ class ContextManager:
         # Return messages in reverse chronological order (newest first)
         return chat_history
 
+Peakperformer, [4/30/2025 8:11 AM]
 class PromptEngine:
     def create_prompt(self, query: str, config: dict, context: str = "") -> str:
         """Create optimized prompt based on business type and configuration"""
@@ -127,8 +129,9 @@ class PromptEngine:
 
         return prompt
 
+Peakperformer, [4/30/2025 8:11 AM]
 class ResponseGenerator:
-    def __init__(self, model: ChatOpenAI, api_key: str = None):
+    def init(self, model: ChatOpenAI, api_key: str = None):
         self.model = model
         # Store API key directly or get from environment if not provided
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
@@ -186,7 +189,7 @@ class ResponseOptimizer:
         return original_response
 
 class AIService:
-    def __init__(self):
+    def init(self):
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.model = ChatOpenAI(api_key=self.api_key, temperature=0.7)
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
@@ -204,7 +207,8 @@ class AIService:
         self.vector_store = Chroma(embedding_function=self.embeddings)
         self.vector_store.add_documents(documents=doc_objects)
 
-    async def get_response(self, query, config, assistant_id, user_id):
+Peakperformer, [4/30/2025 8:11 AM]
+async def get_response(self, query, config, assistant_id, user_id):
         try:
             # Get business type
             business_type = config.get('business_type', 'selling')
@@ -280,7 +284,7 @@ class AIService:
         # Generate response
 
 class MessageProcessor:
-    def __init__(self, ai_service: AIService):
+    def init(self, ai_service: AIService):
         self.ai_service = ai_service
 
     async def process_message(self, message: str, platform: str, assistant_id: int, user_id: int) -> dict:
@@ -295,7 +299,8 @@ class MessageProcessor:
             user_id=user_id
         )
 
-        # Format response based on platform
+Peakperformer, [4/30/2025 8:11 AM]
+# Format response based on platform
         if platform == "instagram":
             # Instagram has a 2000 character limit
             response = response[:1997] + "..." if len(response) > 2000 else response
