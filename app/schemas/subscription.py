@@ -11,7 +11,7 @@ class SubscriptionPlanBase(BaseModel):
     name: str
     price: float
     features: str
-    duration: DurationType = DurationType.monthly
+    duration: Optional[DurationType] = DurationType.monthly
     duration_months: int = 1
 
 class SubscriptionPlanCreate(SubscriptionPlanBase):
@@ -23,6 +23,7 @@ class SubscriptionPlanResponse(SubscriptionPlanBase):
 
     class Config:
         from_attributes = True
+        from_attributes_names = {'duration': 'duration'}
 
 class SubscriptionCreate(BaseModel):
     user_id: int

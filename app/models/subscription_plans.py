@@ -17,9 +17,21 @@ class SubscriptionPlan(Base):
     name = Column(String, nullable=False)
     price = Column(Float, nullable=False)
     features = Column(String, nullable=False)
-    duration = Column(Enum(DurationType), nullable=False, default=DurationType.monthly)
-    duration_months = Column(Integer, nullable=False, default=1)  # Number of months (1 for monthly, 12 for yearly)
+    # Commented out due to missing columns in database
+    # duration = Column(Enum(DurationType), nullable=False, default=DurationType.monthly)
+    # duration_months = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, default=datetime.now)
+
+    # Add properties to maintain compatibility with existing code
+    @property
+    def duration(self):
+        # Default to monthly if no duration info in database
+        return DurationType.monthly
+        
+    @property
+    def duration_months(self):
+        # Default to 1 month
+        return 1
 
     def __repr__(self):
         return f"<SubscriptionPlan(name={self.name}, price={self.price})>"

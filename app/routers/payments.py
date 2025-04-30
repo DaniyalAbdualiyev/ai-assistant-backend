@@ -97,7 +97,8 @@ async def create_subscription(
             
             # Calculate subscription end date based on plan duration
             start_date = datetime.utcnow()
-            end_date = start_date + timedelta(days=30 * plan.duration_months)
+            # Always use 1 month for now since duration_months isn't in the database
+            end_date = start_date + timedelta(days=30)
             
             # Create user subscription
             subscription = UserSubscription(
@@ -155,7 +156,8 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
             if plan:
                 # Calculate end date based on plan duration
                 start_date = datetime.utcnow()
-                end_date = start_date + timedelta(days=30 * plan.duration_months)
+                # Always use 1 month for now since duration_months isn't in the database
+                end_date = start_date + timedelta(days=30)
                 
                 # Create user subscription
                 subscription = UserSubscription(
@@ -241,9 +243,8 @@ async def create_plan(
         new_plan = SubscriptionPlan(
             name=plan.name,
             price=plan.price,
-            features=plan.features,
-            duration=plan.duration,
-            duration_months=plan.duration_months
+            features=plan.features
+            # Both duration and duration_months are removed since they don't exist in the database
         )
         db.add(new_plan)
         db.commit()

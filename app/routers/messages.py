@@ -16,6 +16,7 @@ from app.services.vector_store import search_similar_texts
 from app.services.analytics_service import AnalyticsService
 import logging
 from app.services.ai_service import get_business_temperature
+from fastapi import Request
 
 
 load_dotenv()
