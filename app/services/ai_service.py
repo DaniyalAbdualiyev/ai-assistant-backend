@@ -204,7 +204,7 @@ class AIService:
         self.vector_store = Chroma(embedding_function=self.embeddings)
         self.vector_store.add_documents(documents=doc_objects)
 
-async def get_response(self, query, config, assistant_id, user_id):
+    async def get_response(self, query, config, assistant_id, user_id):
         try:
             # Get business type
             business_type = config.get('business_type', 'selling')
@@ -247,9 +247,8 @@ async def get_response(self, query, config, assistant_id, user_id):
             )
             
             return response
-
         except Exception as e:
-            return f"I apologize, but I'm having trouble processing your request. {str(e)}"
+            raise Exception(f"Error generating response: {str(e)}")
 
 async def detect_intent(self, query):
     """Detect user intent from query"""
