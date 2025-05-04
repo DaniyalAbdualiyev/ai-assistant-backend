@@ -14,6 +14,7 @@ import io
 import os
 import logging
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 
@@ -201,13 +202,28 @@ async def chat_with_assistant(
     user=Depends(verify_active_subscription)  # Require active subscription
 ):
     """Chat with an AI assistant"""
+    logger.info(f"[CHAT] Received chat request for assistant_id={assistant_id}, query={query.text[:100]}...")
+    
     assistant = db.query(AIAssistant).filter(
         AIAssistant.id == assistant_id, 
         AIAssistant.user_id == user.id
     ).first()
     
     if not assistant:
+        logger.warning(f"[CHAT] Assistant not found: assistant_id={assistant_id}, user_id={user.id}")
         raise HTTPException(status_code=404, detail="Assistant not found")
+
+    # Check if this assistant has a business profile with knowledge base
+    business_profile = db.query(BusinessProfile).filter(
+        BusinessProfile.assistant_id == assistant.id
+    ).first()
+    
+    if business_profile and business_profile.knowledge_base:
+        kb_id = business_profile.knowledge_base.get('id', 'None')
+        kb_namespace = business_profile.knowledge_base.get('namespace', 'None')
+        logger.info(f"[CHAT] Assistant has knowledge base: id={kb_id}, namespace={kb_namespace}")
+    else:
+        logger.warning(f"[CHAT] Assistant {assistant_id} has no knowledge base configured")
 
     # Use query language if provided, otherwise use assistant's default language
     language = query.language if query.language else assistant.language
@@ -217,16 +233,32 @@ async def chat_with_assistant(
         "tone": query.tone if hasattr(query, 'tone') and query.tone else "normal",
         "business_type": query.business_type if hasattr(query, 'business_type') else "selling"
     }
+    
+    logger.info(f"[CHAT] Using config: {config}")
 
     try:
+        logger.info(f"[CHAT] Getting AI response for assistant_id={assistant_id}")
+        start_time = time.time()
+        
+        # Pass the db session to the AI service
         response = await ai_service.get_response(
             query.text,
             config,
             assistant_id,
-            user.id
+            user.id,
+            db=db  # Pass database session
         )
+        
+        elapsed_time = time.time() - start_time
+        logger.info(f"[CHAT] Response generated in {elapsed_time:.2f} seconds")
+        
+        # Log a preview of the response
+        response_preview = response[:200] + "..." if len(response) > 200 else response
+        logger.info(f"[CHAT] AI response preview: {response_preview}")
+        
         return {"response": response}
     except Exception as e:
+        logger.error(f"[CHAT] Error getting AI response: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{assistant_id}/upload-knowledge")

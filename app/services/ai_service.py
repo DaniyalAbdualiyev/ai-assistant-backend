@@ -8,6 +8,13 @@ import json
 from fastapi import APIRouter
 from typing import Dict, List
 from datetime import datetime
+import logging
+from app.services.vector_store import search_similar_texts
+from app.models.business_profile import BusinessProfile
+from sqlalchemy.orm import Session
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -204,7 +211,11 @@ class AIService:
         self.vector_store = Chroma(embedding_function=self.embeddings)
         self.vector_store.add_documents(documents=doc_objects)
 
-    async def get_response(self, query, config, assistant_id, user_id):
+    async def get_response(self, query, config, assistant_id, user_id, db=None):
+        logger.info(f"[AI_SERVICE] Generating response for query: {query[:100]}...")
+        logger.info(f"[AI_SERVICE] Assistant ID: {assistant_id}, User ID: {user_id}")
+        logger.info(f"[AI_SERVICE] Config: {config}")
+        
         try:
             # Get business type
             business_type = config.get('business_type', 'selling')
@@ -212,28 +223,79 @@ class AIService:
             # Get appropriate temperature for this business type
             # Use config temperature if provided, otherwise get from business type mapping
             temperature = config.get('temperature', get_business_temperature(business_type))
+            logger.info(f"[AI_SERVICE] Using temperature: {temperature} for business_type: {business_type}")
             
-            # Get vector store context if available
-            context = ""
-            if self.vector_store:
-                results = self.vector_store.similarity_search(query, k=2)
-                context = "\n".join([doc.page_content[:2000] for doc in results])
-
-            # Create optimized prompt
+            # Check for business profile and knowledge base
+            knowledge_context = ""
+            
+            if db:
+                logger.info(f"[AI_SERVICE] Checking for business profile and knowledge base")
+                business_profile = db.query(BusinessProfile).filter(
+                    BusinessProfile.assistant_id == assistant_id
+                ).first()
+                
+                if business_profile:
+                    logger.info(f"[AI_SERVICE] Found business profile: {business_profile.id}")
+                    
+                    if business_profile.knowledge_base:
+                        # Get the namespace from the business profile
+                        namespace = business_profile.knowledge_base.get('namespace')
+                        kb_id = business_profile.knowledge_base.get('id')
+                        logger.info(f"[AI_SERVICE] Found knowledge base: id={kb_id}, namespace={namespace}")
+                        
+                        # Search for relevant documents
+                        logger.info(f"[AI_SERVICE] Searching for relevant knowledge with query: {query[:100]}...")
+                        relevant_docs = search_similar_texts(query, namespace=namespace)
+                        
+                        if relevant_docs:
+                            logger.info(f"[AI_SERVICE] Found {len(relevant_docs)} relevant documents")
+                            
+                            # Add relevant business knowledge to context
+                            knowledge_context = "\n".join([
+                                f"Business Knowledge: {doc.metadata.get('text', 'No text available')}"
+                                for doc in relevant_docs
+                            ])
+                            
+                            # Log a preview of the knowledge context
+                            knowledge_preview = knowledge_context[:200] + "..." if len(knowledge_context) > 200 else knowledge_context
+                            logger.info(f"[AI_SERVICE] Knowledge context preview: {knowledge_preview}")
+                        else:
+                            logger.warning(f"[AI_SERVICE] No relevant documents found in the knowledge base")
+                    else:
+                        logger.warning(f"[AI_SERVICE] Business profile {business_profile.id} has no knowledge base configured")
+                else:
+                    logger.warning(f"[AI_SERVICE] No business profile found for assistant_id={assistant_id}")
+            else:
+                logger.warning(f"[AI_SERVICE] No database session provided, skipping knowledge base lookup")
+            
+            # Create optimized prompt with knowledge context
             prompt = self.prompt_engine.create_prompt(
                 query=query,
                 config=config,
-                context=context
+                context=knowledge_context
             )
+            
+            # Log the prompt
+            prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
+            logger.info(f"[AI_SERVICE] Generated prompt: {prompt_preview}")
 
             # Generate response with business-specific temperature
+            logger.info(f"[AI_SERVICE] Calling OpenAI API to generate response")
             response = await self.response_generator.generate_response(prompt, temperature)
+            
+            # Log the raw response
+            response_preview = response[:200] + "..." if len(response) > 200 else response
+            logger.info(f"[AI_SERVICE] Raw response from OpenAI: {response_preview}")
 
             # Optimize based on business type
             if config['business_type'] == 'selling':
                 response = self.response_optimizer.optimize_sales_response(response)
             elif config['business_type'] == 'consulting':
                 response = self.response_optimizer.optimize_consulting_response(response)
+            
+            # Log any optimization done
+            if config['business_type'] in ['selling', 'consulting']:
+                logger.info(f"[AI_SERVICE] Response optimized for {config['business_type']}")
 
             # Store in conversation history
             conversation_key = f"{assistant_id}_{user_id}"
@@ -246,9 +308,11 @@ class AIService:
                 {"role": "assistant", "content": response}
             )
             
+            logger.info(f"[AI_SERVICE] Response generation completed successfully")
             return response
         except Exception as e:
-            raise Exception(f"Error generating response: {str(e)}")
+            logger.error(f"[AI_SERVICE] Error generating response: {str(e)}", exc_info=True)
+            return f"I apologize, but I encountered an error: {str(e)}"
 
 async def detect_intent(self, query):
     """Detect user intent from query"""
