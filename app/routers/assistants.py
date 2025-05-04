@@ -237,43 +237,57 @@ async def upload_knowledge(
     user=Depends(verify_active_subscription)  # Require active subscription
 ):
     """Upload knowledge base document for an assistant"""
+    logger.info(f"Knowledge base upload started for assistant_id={assistant_id}, file={file.filename}")
+    
     assistant = db.query(AIAssistant).filter(
         AIAssistant.id == assistant_id, 
         AIAssistant.user_id == user.id
     ).first()
     
     if not assistant:
+        logger.warning(f"Assistant not found: assistant_id={assistant_id}, user_id={user.id}")
         raise HTTPException(status_code=404, detail="Assistant not found")
         
     # Get business profile if it exists
     business_profile = None
     if hasattr(assistant, 'business_profile') and assistant.business_profile:
         business_profile = assistant.business_profile
+        logger.info(f"Using existing business profile: profile_id={business_profile.id}")
     
     # If no business profile exists, create one
     if not business_profile:
+        logger.warning(f"No business profile found for assistant_id={assistant_id}")
         raise HTTPException(status_code=400, detail="Assistant has no business profile. Please create one first.")
 
     # Validate file type
     if not file.filename.endswith(('.pdf', '.docx', '.txt')):
+        logger.warning(f"Invalid file type: {file.filename}")
         raise HTTPException(
             status_code=400,
             detail="Unsupported file type. Please upload PDF, DOCX, or TXT files."
         )
 
     try:
+        logger.info(f"Processing file: {file.filename}")
         # Process the uploaded file
         processed_data = await process_file(file)
         if not processed_data:
+            logger.error(f"Failed to extract text from file: {file.filename}")
             raise HTTPException(status_code=400, detail="Could not extract text from file")
+        
+        logger.info(f"Text extracted from file, length: {len(processed_data)} characters")
         
         # Store embeddings in vector database with business profile namespace
         namespace = f"business_{business_profile.id}"
+        logger.info(f"Storing embeddings in namespace: {namespace}")
+        
         knowledge_base_id = store_embeddings(processed_data, namespace=namespace)
+        logger.info(f"Knowledge base created with ID: {knowledge_base_id}")
         
         # Update business profile with knowledge base reference
         business_profile.knowledge_base = {"id": knowledge_base_id, "namespace": namespace}
         db.commit()
+        logger.info(f"Business profile updated with knowledge base reference")
         
         # Generate chat path and full URL for the business profile
         chat_path = f"/web-chat/{business_profile.unique_id}"
@@ -281,6 +295,8 @@ async def upload_knowledge(
         
         # Ensure unique_id is a string
         business_profile.unique_id = str(business_profile.unique_id)
+        
+        logger.info(f"Knowledge base upload completed successfully for assistant_id={assistant_id}")
         
         return {
             "message": "Knowledge base updated successfully",
@@ -295,4 +311,5 @@ async def upload_knowledge(
         }
     except Exception as e:
         db.rollback()
+        logger.error(f"Error uploading knowledge base: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

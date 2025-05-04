@@ -58,7 +58,23 @@ def search_similar_texts(query: str, top_k: int = 5, namespace: str = None) -> L
     else:
         logger.info("Searching for similar texts without namespace specification")
         
-    return EmbeddingService.search_similar_texts(query, top_k, namespace=namespace)
+    try:
+        results = EmbeddingService.search_similar_texts(query, top_k, namespace=namespace)
+        
+        # Log the results
+        if results:
+            logger.info(f"Found {len(results)} similar documents in namespace: {namespace}")
+            for i, result in enumerate(results):
+                score = getattr(result, 'score', 'N/A')
+                text_snippet = result.metadata.get('text', 'No text')[:100] + "..." if len(result.metadata.get('text', '')) > 100 else result.metadata.get('text', 'No text')
+                logger.info(f"Match {i+1}: Score: {score}, Text snippet: {text_snippet}")
+        else:
+            logger.warning(f"No similar documents found in namespace: {namespace} for query: {query[:100]}...")
+            
+        return results
+    except Exception as e:
+        logger.error(f"Error searching for similar texts: {str(e)}", exc_info=True)
+        raise
 
 def add_to_knowledge_base(texts: List[str], metadata: List[Dict] = None, namespace: str = None):
     """
@@ -79,7 +95,15 @@ def store_embeddings(text: str, namespace: str = None) -> str:
         The ID of the stored document
     """
     try:
+        text_length = len(text)
+        logger.info(f"Generating embeddings for text of length {text_length} characters")
+        
+        # Truncate the text if it's very long (for logging purposes)
+        text_snippet = text[:100] + "..." if len(text) > 100 else text
+        logger.debug(f"Text snippet: {text_snippet}")
+        
         # Generate embeddings using OpenAI
+        logger.info("Calling OpenAI API to generate embeddings")
         response = client.embeddings.create(
             input=text,
             model="text-embedding-ada-002"
@@ -87,9 +111,12 @@ def store_embeddings(text: str, namespace: str = None) -> str:
         
         # Get the embeddings
         embeddings = response.data[0].embedding
+        embedding_dimensions = len(embeddings)
+        logger.info(f"Embeddings generated successfully: {embedding_dimensions} dimensions")
         
         # Generate a unique ID for this document
         doc_id = str(uuid.uuid4())
+        logger.info(f"Generated document ID: {doc_id}")
         
         # Prepare vector
         vector = {
@@ -106,7 +133,13 @@ def store_embeddings(text: str, namespace: str = None) -> str:
             logger.info("Storing embeddings without namespace")
             EmbeddingService.upsert_to_pinecone([vector])
         
+        # Get index stats after upsert
+        stats = EmbeddingService.get_index_stats()
+        total_vectors = stats.get('total_vector_count', 'unknown')
+        logger.info(f"Vector storage complete. Total vectors in index: {total_vectors}")
+        
         return doc_id
         
     except Exception as e:
+        logger.error(f"Error generating and storing embeddings: {str(e)}", exc_info=True)
         raise Exception(f"Error generating and storing embeddings: {str(e)}") 

@@ -89,21 +89,28 @@ async def chat_with_business_assistant(
     Send a message to the business AI assistant and get a response.
     This endpoint is used by the web chat interface accessed via shared link.
     """
+    logger.info(f"Web chat message received for business_unique_id={business_unique_id}, client_id={client_id}")
+    logger.info(f"User query: {message.content[:100]}...")
+    
     # Generate a client ID if not provided
     if not client_id:
         client_id = str(uuid.uuid4())
+        logger.info(f"Generated new client_id: {client_id}")
         
     # Create a session key
     session_key = f"{business_unique_id}_{client_id}"
     
     # Check if session exists, if not create it
     if session_key not in chat_sessions:
+        logger.info(f"Creating new web chat session for key: {session_key}")
+        
         # Get business profile
         business_profile = db.query(BusinessProfile).filter(
             BusinessProfile.unique_id == business_unique_id
         ).first()
         
         if not business_profile:
+            logger.warning(f"Business profile not found: {business_unique_id}")
             raise HTTPException(status_code=404, detail="Business profile not found")
         
         # Get the associated AI assistant
@@ -112,6 +119,7 @@ async def chat_with_business_assistant(
         ).first()
         
         if not assistant:
+            logger.warning(f"AI assistant not found for business profile: {business_unique_id}")
             raise HTTPException(status_code=404, detail="AI assistant not found")
             
         # Create new session
@@ -121,6 +129,8 @@ async def chat_with_business_assistant(
             "created_at": datetime.utcnow(),
             "messages": []
         }
+        
+        logger.info(f"New web chat session created for business_id={business_profile.id}, assistant_id={assistant.id}")
         
         # Record client session for analytics
         client_ip = request.client.host if request and request.client else None
@@ -134,6 +144,8 @@ async def chat_with_business_assistant(
             client_ip=client_ip,
             client_device=client_device
         )
+    else:
+        logger.info(f"Using existing web chat session: {session_key}")
     
     session = chat_sessions[session_key]
     
@@ -147,7 +159,16 @@ async def chat_with_business_assistant(
     ).first()
     
     if not business_profile or not assistant:
+        logger.warning(f"Business profile or assistant not found for session: {session_key}")
         raise HTTPException(status_code=404, detail="Business profile or assistant not found")
+    
+    # Check if knowledge base exists for business profile
+    has_knowledge_base = bool(business_profile.knowledge_base)
+    if has_knowledge_base:
+        namespace = business_profile.knowledge_base.get('namespace')
+        logger.info(f"Business has knowledge base with namespace: {namespace}")
+    else:
+        logger.warning(f"Business profile {business_profile.id} has no knowledge base configured")
     
     # Store user message in session
     session["messages"].append({
@@ -160,13 +181,16 @@ async def chat_with_business_assistant(
         start_time = time.time()
         
         # Prepare chat context with business profile knowledge
+        logger.info(f"Preparing chat context for web chat with assistant_id={assistant.id}")
         formatted_messages = prepare_chat_context(assistant.id, message.content, db)
         
         # Get AI response
+        logger.info(f"Getting AI response for web chat with model={assistant.model}")
         ai_response = get_ai_response(formatted_messages, assistant.model)
         
         # Calculate response time
         response_time = time.time() - start_time
+        logger.info(f"Response generated in {response_time:.2f} seconds")
         
         # Store AI response in session
         session["messages"].append({
@@ -177,6 +201,8 @@ async def chat_with_business_assistant(
         
         # Update analytics
         message_count = len(session["messages"])
+        logger.info(f"Web chat session now has {message_count} messages")
+        
         await analytics_service.record_analytics_direct(
             db=db,
             assistant_id=assistant.id,
@@ -185,6 +211,10 @@ async def chat_with_business_assistant(
             message_count=message_count,
             response_time=response_time
         )
+        
+        # Log a preview of the response
+        response_preview = ai_response[:200] + "..." if len(ai_response) > 200 else ai_response
+        logger.info(f"Web chat response: {response_preview}")
         
         # Return the response
         return {
@@ -196,7 +226,7 @@ async def chat_with_business_assistant(
         }
         
     except Exception as e:
-        logger.error(f"Error processing chat: {str(e)}")
+        logger.error(f"Error processing web chat: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 
 @router.get("/history/{business_unique_id}")

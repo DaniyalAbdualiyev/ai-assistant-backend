@@ -144,6 +144,10 @@ def save_initial_message(user_query: str, assistant_id: int, user_id: int, db: S
 def prepare_chat_context(assistant_id: int, current_message: str, db: Session) -> list:
     """Get chat history and format it for the AI model."""
     try:
+        logger = logging.getLogger(__name__)
+        logger.info(f"Preparing chat context for assistant_id={assistant_id}")
+        logger.info(f"User query: {current_message[:100]}...")
+        
         # Get the business profile for this assistant
         business_profile = db.query(BusinessProfile).filter(
             BusinessProfile.assistant_id == assistant_id
@@ -156,31 +160,51 @@ def prepare_chat_context(assistant_id: int, current_message: str, db: Session) -
         }]
         
         # If we have a business profile with knowledge base, search for relevant information
-        if business_profile and business_profile.knowledge_base:
-            # Get the namespace from the business profile
-            namespace = business_profile.knowledge_base.get('namespace')
-            if not namespace:
-                # Fallback to a default namespace format if not stored
-                namespace = f"business_{business_profile.id}"
+        if business_profile:
+            if business_profile.knowledge_base:
+                # Get the namespace from the business profile
+                namespace = business_profile.knowledge_base.get('namespace')
+                if not namespace:
+                    # Fallback to a default namespace format if not stored
+                    namespace = f"business_{business_profile.id}"
+                    logger.warning(f"No namespace found in knowledge_base, using fallback: {namespace}")
+                else:
+                    logger.info(f"Using knowledge base namespace: {namespace}")
                 
-            # Search for relevant documents using the business-specific namespace
-            relevant_docs = search_similar_texts(current_message, namespace=namespace)
-            
-            if relevant_docs:
-                # Add relevant business knowledge to context
-                knowledge_context = "\n".join([
-                    f"Business Knowledge: {doc.metadata['text']}"
-                    for doc in relevant_docs
-                ])
-                formatted_messages.append({
-                    "role": "system",
-                    "content": knowledge_context
-                })
+                # Search for relevant documents using the business-specific namespace
+                logger.info(f"Searching knowledge base for relevant documents with query: {current_message[:100]}...")
+                relevant_docs = search_similar_texts(current_message, namespace=namespace)
+                
+                if relevant_docs:
+                    logger.info(f"Found {len(relevant_docs)} relevant documents in knowledge base")
+                    
+                    # Add relevant business knowledge to context
+                    knowledge_context = "\n".join([
+                        f"Business Knowledge: {doc.metadata['text']}"
+                        for doc in relevant_docs
+                    ])
+                    
+                    # Log a preview of the knowledge being added to context
+                    knowledge_preview = knowledge_context[:200] + "..." if len(knowledge_context) > 200 else knowledge_context
+                    logger.info(f"Adding knowledge base context: {knowledge_preview}")
+                    
+                    formatted_messages.append({
+                        "role": "system",
+                        "content": knowledge_context
+                    })
+                else:
+                    logger.warning(f"No relevant documents found in knowledge base for query: {current_message[:100]}...")
+            else:
+                logger.info(f"Business profile {business_profile.id} has no knowledge base configured")
+        else:
+            logger.info(f"No business profile found for assistant_id={assistant_id}")
         
         # Get recent chat history
         chat_history = db.query(Message).filter(
             Message.assistant_id == assistant_id
         ).order_by(Message.timestamp.desc()).limit(5).all()
+        
+        logger.info(f"Retrieved {len(chat_history)} previous messages for chat context")
         
         # Add chat history
         for msg in reversed(chat_history):
@@ -191,18 +215,31 @@ def prepare_chat_context(assistant_id: int, current_message: str, db: Session) -
         
         # Add current message
         formatted_messages.append({"role": "user", "content": current_message})
+        
+        logger.info(f"Final context prepared with {len(formatted_messages)} messages")
         return formatted_messages
         
     except Exception as e:
-        logging.error(f"Error preparing chat context: {str(e)}")
+        logging.error(f"Error preparing chat context: {str(e)}", exc_info=True)
         # Fallback to basic context if there's an error
         return [{"role": "user", "content": current_message}]
 
 def get_ai_response(formatted_messages: list, model: str, business_type: str = "selling") -> str:
     """Get response from OpenAI API with temperature based on business type."""
+    logger = logging.getLogger(__name__)
     try:
         # Get appropriate temperature for this business type
         temperature = get_business_temperature(business_type)
+        
+        # Log request to OpenAI
+        logger.info(f"Sending request to OpenAI API with model={model}, temperature={temperature}")
+        
+        # Check if we have knowledge base information in the context
+        has_knowledge_base = any(
+            msg.get("role") == "system" and "Business Knowledge:" in msg.get("content", "")
+            for msg in formatted_messages
+        )
+        logger.info(f"Request includes knowledge base information: {has_knowledge_base}")
         
         response = client.chat.completions.create(
             model=model,
@@ -210,8 +247,16 @@ def get_ai_response(formatted_messages: list, model: str, business_type: str = "
             temperature=temperature,  # Use business-type specific temperature
             max_tokens=1000
         )
-        return response.choices[0].message.content if response.choices else "AI could not generate a response"
+        
+        ai_response = response.choices[0].message.content if response.choices else "AI could not generate a response"
+        
+        # Log a preview of the response
+        response_preview = ai_response[:200] + "..." if len(ai_response) > 200 else ai_response
+        logger.info(f"Received response from OpenAI: {response_preview}")
+        
+        return ai_response
     except Exception as e:
+        logger.error(f"Error getting AI response: {str(e)}", exc_info=True)
         return "Connection with AI assistant failed. Please try again later."
 
 def save_and_format_response(db_message: Message, ai_response: str, db: Session) -> MessageResponse:
