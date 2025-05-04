@@ -49,7 +49,6 @@ app.include_router(users, prefix="/users", tags=["Users"])
 app.include_router(assistants, prefix="/assistants", tags=["Assistants"])
 app.include_router(messages, prefix="/messages", tags=["Messages"])
 app.include_router(payments, prefix="/payments")
-
 app.include_router(webhook, tags=["Webhooks"])
 app.include_router(web_chat, prefix="/web-chat", tags=["Web Chat"])
 app.include_router(analytics)

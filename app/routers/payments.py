@@ -70,8 +70,8 @@ async def create_subscription(
                 "quantity": 1,
             }],
             mode="payment",
-            success_url="http://localhost:8000/payments/success?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url="http://localhost:8000/payments/cancel?session_id={CHECKOUT_SESSION_ID}",
+            success_url=f"{os.getenv('FRONTEND_BASE_URL', 'http://localhost:3000')}/payments/success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=f"{os.getenv('FRONTEND_BASE_URL', 'http://localhost:3000')}/payments/cancel?session_id={CHECKOUT_SESSION_ID}",
         )
         
         logger.info(f"Created Stripe session: {checkout_session.id}")
