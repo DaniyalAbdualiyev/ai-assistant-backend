@@ -159,25 +159,49 @@ class ResponseGenerator:
             return f"I apologize, but I'm having trouble generating a response. {str(e)}"
 
 class ResponseOptimizer:
-    def optimize_sales_response(self, original_response: str) -> str:
-        """Make responses more likely to lead to sales"""
+    def optimize_sales_response(self, original_response: str, purchase_intent=False, knowledge_base=None) -> str:
+        """Make responses more likely to lead to sales or handle purchase intent"""
         
-        # Add call-to-action
+        # If purchase intent is detected, provide contact information
+        if purchase_intent:
+            contact_info = self._extract_contact_info(knowledge_base)
+            if contact_info:
+                return f"Great! To proceed with your order, please contact us using the following information:\n\n{contact_info}\n\nOur team will assist you with completing your purchase."
+        
+        # Regular sales optimization
         if "price" in original_response.lower():
             original_response += "\nWould you like to proceed with the purchase? I can help you place an order right now."
             
-        # Add urgency when mentioning products
         if "product" in original_response.lower():
             original_response = original_response.replace(
                 "available",
                 "available now with special pricing"
             )
             
-        # Add social proof
         if "interested" in original_response.lower():
             original_response += "\nMany customers have found this option perfect for their needs."
             
         return original_response
+    
+    def _extract_contact_info(self, knowledge_base):
+        """Extract contact information from knowledge base"""
+        if not knowledge_base:
+            return "Please contact our sales team to complete your order."
+            
+        contact_lines = []
+        found_contact = False
+        
+        # Look for common contact information patterns in the knowledge base
+        for line in knowledge_base.split('\n'):
+            line = line.strip()
+            if any(keyword in line.lower() for keyword in ['phone', 'email', 'contact', 'call us', '@']):
+                contact_lines.append(line)
+                found_contact = True
+                
+        if found_contact:
+            return "\n".join(contact_lines)
+        else:
+            return "Please contact our sales team to complete your order."
 
     def optimize_consulting_response(self, original_response: str) -> str:
         """Make responses more likely to lead to consultations"""
@@ -279,6 +303,9 @@ class AIService:
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
             logger.info(f"[AI_SERVICE] Generated prompt: {prompt_preview}")
 
+            # Detect purchase intent
+            purchase_intent = self._detect_purchase_intent(query)
+            
             # Generate response with business-specific temperature
             logger.info(f"[AI_SERVICE] Calling OpenAI API to generate response")
             response = await self.response_generator.generate_response(prompt, temperature)
@@ -287,15 +314,20 @@ class AIService:
             response_preview = response[:200] + "..." if len(response) > 200 else response
             logger.info(f"[AI_SERVICE] Raw response from OpenAI: {response_preview}")
 
-            # Optimize based on business type
-            if config['business_type'] == 'selling':
-                response = self.response_optimizer.optimize_sales_response(response)
-            elif config['business_type'] == 'consulting':
+            # Optimize response based on business type and purchase intent
+            if business_type == "selling":
+                # Pass knowledge context to the optimizer for contact info extraction
+                response = self.response_optimizer.optimize_sales_response(
+                    response, 
+                    purchase_intent=purchase_intent,
+                    knowledge_base=knowledge_context if purchase_intent else None
+                )
+            elif business_type == 'consulting':
                 response = self.response_optimizer.optimize_consulting_response(response)
             
             # Log any optimization done
-            if config['business_type'] in ['selling', 'consulting']:
-                logger.info(f"[AI_SERVICE] Response optimized for {config['business_type']}")
+            if business_type in ['selling', 'consulting']:
+                logger.info(f"[AI_SERVICE] Response optimized for {business_type}")
 
             # Store in conversation history
             conversation_key = f"{assistant_id}_{user_id}"
@@ -313,6 +345,17 @@ class AIService:
         except Exception as e:
             logger.error(f"[AI_SERVICE] Error generating response: {str(e)}", exc_info=True)
             return f"I apologize, but I encountered an error: {str(e)}"
+
+    def _detect_purchase_intent(self, query):
+        """Detect if the user is expressing purchase intent"""
+        query_lower = query.lower()
+        purchase_keywords = [
+            "i want to buy", "let's order", "i'll take", "i want this", 
+            "purchase", "buy now", "order now", "add to cart", "checkout",
+            "i'm ready to buy", "let's purchase", "i'd like to order"
+        ]
+        
+        return any(keyword in query_lower for keyword in purchase_keywords)
 
 async def detect_intent(self, query):
     """Detect user intent from query"""
