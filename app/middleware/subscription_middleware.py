@@ -6,6 +6,7 @@ from app.models.user_subscription import UserSubscription
 from datetime import datetime
 import logging
 
+
 logger = logging.getLogger(__name__)
 
 async def verify_active_subscription(
