@@ -2,7 +2,6 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
-
 # Forward references for relationships
 from sqlalchemy.ext.declarative import declared_attr
 
