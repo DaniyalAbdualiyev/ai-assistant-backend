@@ -462,3 +462,92 @@ class AnalyticsService:
                 "conversations_last_7_days": [0, 0, 0, 0, 0, 0, 0],
                 "messages_last_7_days": [0, 0, 0, 0, 0, 0, 0]
             }
+
+    @staticmethod
+    async def record_client_session(
+        db,
+        client_session_id: str,
+        assistant_id: int,
+        business_profile_id: int,
+        client_ip: Optional[str] = None,
+        client_device: Optional[str] = None
+    ) -> bool:
+        """
+        Record a new client session for analytics.
+        """
+        try:
+            now = datetime.utcnow()
+            
+            # Check if session already exists
+            exists = db.execute(
+                text("SELECT id FROM client_analytics WHERE client_session_id = :session_id"),
+                {"session_id": client_session_id}
+            ).fetchone()
+            
+            if not exists:
+                db.execute(
+                    text("""
+                    INSERT INTO client_analytics 
+                    (client_session_id, assistant_id, business_profile_id, session_start, message_count, client_ip, client_device)
+                    VALUES (:session_id, :assistant_id, :business_id, :start_time, 0, :client_ip, :client_device)
+                    """),
+                    {
+                        "session_id": client_session_id,
+                        "assistant_id": assistant_id,
+                        "business_id": business_profile_id,
+                        "start_time": now,
+                        "client_ip": client_ip,
+                        "client_device": client_device
+                    }
+                )
+                
+                # Update conversation analytics
+                today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                analytics_exists = db.execute(
+                    text("""
+                    SELECT id FROM conversation_analytics 
+                    WHERE assistant_id = :assistant_id 
+                    AND business_profile_id = :business_id 
+                    AND date(date) = date(:today)
+                    """),
+                    {
+                        "assistant_id": assistant_id,
+                        "business_id": business_profile_id,
+                        "today": today
+                    }
+                ).fetchone()
+                
+                if analytics_exists:
+                    db.execute(
+                        text("""
+                        UPDATE conversation_analytics 
+                        SET total_conversations = total_conversations + 1,
+                            last_updated = :updated_at
+                        WHERE id = :id
+                        """),
+                        {
+                            "updated_at": now,
+                            "id": analytics_exists[0]
+                        }
+                    )
+                else:
+                    db.execute(
+                        text("""
+                        INSERT INTO conversation_analytics 
+                        (assistant_id, business_profile_id, total_conversations, total_messages, avg_response_time, date, last_updated)
+                        VALUES (:assistant_id, :business_id, 1, 0, 0.0, :today, :updated_at)
+                        """),
+                        {
+                            "assistant_id": assistant_id,
+                            "business_id": business_profile_id,
+                            "today": today,
+                            "updated_at": now
+                        }
+                    )
+            
+            db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error recording client session: {str(e)}")
+            db.rollback()
+            return False

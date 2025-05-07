@@ -55,10 +55,9 @@ def create_assistant(
         db.commit()
         db.refresh(business_profile)
         
-
         
         # Generate chat path and full URL for the business profile
-        chat_path = f"/web-chat/{business_profile.unique_id}"
+        chat_path = f"/web-chat/simplified/{business_profile.unique_id}"
         chat_url = f"{BASE_URL}{chat_path}"
     
     # Prepare response with assistant data and chat link if available
@@ -133,7 +132,7 @@ def get_assistant(assistant_id: int, db: Session = Depends(get_db), user=Depends
             }
             
             # Generate chat URL
-            chat_url = f"{BASE_URL}/web-chat/{business_profile.unique_id}"
+            chat_url = f"{BASE_URL}/web-chat/simplified/{business_profile.unique_id}"
             response["chat_url"] = chat_url
     
     return response
@@ -158,8 +157,8 @@ def get_assistant_chat_link(assistant_id: int, db: Session = Depends(get_db), us
     if not business_profile:
         raise HTTPException(status_code=404, detail="Business profile not found")
     
-    # Generate chat URL
-    chat_url = f"{BASE_URL}/web-chat/{business_profile.unique_id}"
+    # Generate chat URL - using the new simplified endpoint
+    chat_url = f"{BASE_URL}/web-chat/simplified/{business_profile.unique_id}"
     
     return {
         "business_name": business_profile.business_name,
@@ -322,7 +321,7 @@ async def upload_knowledge(
         logger.info(f"Business profile updated with knowledge base reference")
         
         # Generate chat path and full URL for the business profile
-        chat_path = f"/web-chat/{business_profile.unique_id}"
+        chat_path = f"/web-chat/simplified/{business_profile.unique_id}"
         chat_url = f"{BASE_URL}{chat_path}"
         
         # Ensure unique_id is a string
