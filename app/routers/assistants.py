@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.models.assistant import AIAssistant
 from app.models.business_profile import BusinessProfile
+from app.models.analytics import ConversationAnalytics
 from app.schemas.assistant import AssistantCreate, AssistantResponse, AssistantQuery, BusinessProfileBase
 from app.dependencies import get_current_user, get_db
 from app.middleware.subscription_middleware import verify_active_subscription
@@ -21,7 +22,7 @@ load_dotenv()
 # Get the base URL from environment variables or use a default
 BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
 
-router = APIRouter()
+router = APIRouter(prefix="/assistants", tags=["assistants"])
 ai_service = AIService()
 
 # Set up logging
@@ -185,13 +186,25 @@ def delete_assistant(assistant_id: int, db: Session = Depends(get_db), user=Depe
     if not assistant:
         raise HTTPException(status_code=404, detail="Assistant not found")
         
-    # Delete business profile if it exists
-    if hasattr(assistant, 'business_profile') and assistant.business_profile:
-        db.delete(assistant.business_profile)
-
-    db.delete(assistant)
-    db.commit()
-    return {"message": "Assistant deleted successfully"}
+    try:
+        # First delete all analytics records that reference either the assistant or its business profile
+        if hasattr(assistant, 'business_profile') and assistant.business_profile:
+            db.query(ConversationAnalytics).filter(
+                (ConversationAnalytics.assistant_id == assistant_id) |
+                (ConversationAnalytics.business_profile_id == assistant.business_profile.id)
+            ).delete(synchronize_session=False)
+        else:
+            db.query(ConversationAnalytics).filter(
+                ConversationAnalytics.assistant_id == assistant_id
+            ).delete(synchronize_session=False)
+            
+        # Then delete the assistant (which will cascade delete the business profile)
+        db.delete(assistant)
+        db.commit()
+        return {"message": "Assistant deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{assistant_id}/chat")
 async def chat_with_assistant(
