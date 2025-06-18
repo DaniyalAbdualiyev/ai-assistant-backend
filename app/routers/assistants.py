@@ -22,7 +22,7 @@ load_dotenv()
 # Get the base URL from environment variables or use a default
 BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
 
-router = APIRouter(prefix="/assistants", tags=["assistants"])
+router = APIRouter(tags=["assistants"])
 ai_service = AIService()
 
 # Set up logging
